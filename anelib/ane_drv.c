@@ -18,7 +18,8 @@ int ane_drv_device_open(struct ane_device *ane)
 {
 	int fd = open(ANE_SYSFS_PATH, O_RDWR | FD_CLOEXEC, S_IRUSR | S_IWUSR);
 	if (fd < 0) {
-		fprintf(stderr, "failed to open sysfs %s\n", ANE_SYSFS_PATH);
+		fprintf(stderr, "ANELIB: failed to open sysfs %s\n",
+			ANE_SYSFS_PATH);
 		return -ENODEV;
 	}
 	ane->fd = fd;
@@ -39,10 +40,8 @@ static int ane_drv_nn_init(struct ane_device *ane, struct ane_nn *nn)
 
 	int err = ioctl(ane->fd, DRM_IOCTL_ANE_NN_INIT, &args);
 	if (err) {
-		fprintf(stderr, "ane_drv_nn_init failed with 0x%x\n", err);
-		return -1;
+		return err;
 	}
-
 	nn->handle = args.handle;
 	return 0;
 }
@@ -64,11 +63,7 @@ static int ane_drv_nn_sync(struct ane_device *ane, struct ane_nn *nn)
 	args.fifo_userptr = (uint64_t)nn->fifo_chan;
 
 	err = ioctl(ane->fd, DRM_IOCTL_ANE_NN_SYNC, &args);
-	if (err) {
-		fprintf(stderr, "ane_drv_nn_sync failed with 0x%x\n", err);
-		return err;
-	}
-	return 0;
+	return err;
 }
 
 static int ane_drv_nn_unsync(struct ane_device *ane, struct ane_nn *nn)
@@ -87,13 +82,15 @@ int ane_drv_nn_register(struct ane_device *ane, struct ane_nn *nn)
 
 	err = ane_drv_nn_init(ane, nn);
 	if (err) {
-		fprintf(stderr, "ane_drv_nn_init failed with 0x%x\n", err);
+		fprintf(stderr, "ANELIB: ane_drv_nn_init failed with 0x%x\n",
+			err);
 		goto exit;
 	}
 
 	err = ane_drv_nn_sync(ane, nn);
 	if (err) {
-		fprintf(stderr, "ane_drv_nn_sync failed with 0x%x\n", err);
+		fprintf(stderr, "ANELIB: ane_drv_nn_sync failed with 0x%x\n",
+			err);
 		goto nn_deinit;
 	}
 

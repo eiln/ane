@@ -29,7 +29,7 @@ so those messages won't be received.
 
 
 
-### ~~2. Dirty Iovas~~
+~~### 2. Dirty Iovas~~
 
 ~~Somewhere in the DMA sequence complains (panics) when trying to reuse (what I believe is fully unmapped) old iovas. So the iova allocator leaks on purpose. Weirdly, things work when I reset the allocator by unloading & reloading the module completely. This tells me there's some kind of leak, but I've had this problem for quite a while and without much progress.~~
 
@@ -42,11 +42,12 @@ Had to invalidate TLBs for dart domain 1 & 2.
 
 
 
-### 3. Power Domains
+~~### 3. Power Domains~~
 
-I don't know why they're not called on probe. 
-The always-on flag is set to prevent MMIO faults.
-Hasn't been fixed yet, but should not be too hard.
+~~I don't know why they're not called on probe. The always-on flag is set to prevent MMIO faults. Hasn't been fixed yet, but should not be too hard.~~
+
+Fixed. 
+
 
 
 

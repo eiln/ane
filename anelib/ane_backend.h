@@ -4,7 +4,32 @@
 #ifndef __ANE_BACKEND_H__
 #define __ANE_BACKEND_H__
 
-#include "ane_anec.h"
+#define ANE_FIFO_WIDTH 0x400 // nxtpow2(0x274)
+#define ANE_FIFO_COUNT 0x20
+
+static inline void set_fifo_nid(void *td, int nid)
+{
+	uint32_t hdr0 = *(uint32_t *)td;
+	hdr0 = (hdr0 & 0xf00ffff) | (nid << 16);
+	memcpy(td, &hdr0, sizeof(uint32_t));
+	return;
+}
+
+static inline void ane_load_anec(struct ane_nn *nn, void *anec_data)
+{
+	const struct anec *anec = to_anec(nn);
+
+	memcpy(nn->chans[0], anec_data, anec->size);
+
+	/* do not fucking overflow */
+	memcpy(nn->fifo_chan, anec_data, anec->td_size);
+	memcpy(nn->fifo_chan + ANE_FIFO_WIDTH, anec_data, anec->td_size);
+
+	set_fifo_nid(nn->fifo_chan, FIFO_NID_MAGIC);
+	set_fifo_nid(nn->fifo_chan + ANE_FIFO_WIDTH,
+		     FIFO_NID_MAGIC + ANE_FIFO_COUNT);
+	return;
+}
 
 static int ane_free_chans(struct ane_nn *nn)
 {
@@ -41,34 +66,37 @@ static int ane_alloc_chans(struct ane_nn *nn)
 			oc++;
 		}
 	}
+
 	if (ic != input_count(nn) || oc != output_count(nn)) {
-		fprintf(stderr, "invalid anec setup\n");
-		goto error;
+		fprintf(stderr, "ANELIB: invalid src/dst setup\n");
+		return -EINVAL;
 	}
 
-	nn->chans[0] = ane_zmemalign(anec->tiles[0] * TILE_SIZE);
+	nn->chans[0] = ane_zmemalign(tile_sz(anec->tiles[0]));
 	if (!nn->chans[0]) {
-		goto error;
+		return -ENOMEM;
 	}
 
 	for (int i = 0; i < input_count(nn); i++) {
 		int bdx = nn->imask[i];
-		size_t size = anec->tiles[bdx] * TILE_SIZE;
+		size_t size = tile_sz(anec->tiles[bdx]);
 		nn->chans[bdx] = ane_zmemalign(size);
 		if (!nn->chans[bdx]) {
 			goto error;
 		}
-		printf("allocated input chan %d size 0x%zx\n", bdx, size);
+		printf("ANELIB: allocated input chan %d size 0x%zx\n", bdx,
+		       size);
 	}
 
 	for (int i = 0; i < output_count(nn); i++) {
 		int bdx = nn->omask[i];
-		size_t size = anec->tiles[bdx] * TILE_SIZE;
+		size_t size = tile_sz(anec->tiles[bdx]);
 		nn->chans[bdx] = ane_zmemalign(size);
 		if (!nn->chans[bdx]) {
 			goto error;
 		}
-		printf("allocated output chan %d size 0x%zx\n", bdx, size);
+		printf("ANELIB: allocated output chan %d size 0x%zx\n", bdx,
+		       size);
 	}
 
 	nn->fifo_chan = ane_zmemalign(TILE_SIZE);
@@ -79,33 +107,23 @@ static int ane_alloc_chans(struct ane_nn *nn)
 	return 0;
 
 error:
-	fprintf(stderr, "failed to alloc chans\n");
 	ane_free_chans(nn);
 	return -ENOMEM;
 }
 
-static int ane_inst_backend(struct ane_nn *nn)
+static int ane_inst_backend(struct ane_nn *nn, void *anec_data)
 {
 	int err;
 
 	err = ane_alloc_chans(nn);
 	if (err) {
-		fprintf(stderr, "failed to alloc chans, 0x%x\n", err);
-		goto error;
+		fprintf(stderr, "ANELIB: failed to alloc chans, 0x%x\n", err);
+		return err;
 	}
 
-	err = ane_init_anec(nn); // after chans
-	if (err) {
-		fprintf(stderr, "failed to load anec backend, 0x%x\n", err);
-		goto free_chans;
-	}
+	ane_load_anec(nn, anec_data);
 
 	return 0;
-
-free_chans:
-	ane_free_chans(nn);
-error:
-	return err;
 }
 
 static int ane_free_backend(struct ane_nn *nn)

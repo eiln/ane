@@ -1,12 +1,11 @@
-.PHONY: all anelib anepy clean 
 
-all: anelib anepy 
+.PHONY: all anelib clean
+
+default: anelib
+all: default
 
 anelib:
 	make -C anelib
-anepy:
-	make -C anepy
-
 
 clean:
 	rm -rf build

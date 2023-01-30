@@ -1,9 +1,0 @@
-
-__pycache__/
-*.py[cod]
-*$py.class
-
-*.so
-*.tmp
-*.bin
-*.out

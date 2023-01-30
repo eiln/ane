@@ -9,6 +9,7 @@
 #include <linux/module.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
+#include <linux/pm_domain.h>
 
 #include <drm/drm_drv.h>
 #include <drm/drm_file.h>
@@ -796,46 +797,6 @@ static const struct drm_driver ane_drm_driver = {
 	.minor = 0,
 };
 
-static int ane_iommu_domain_init(struct ane_device *ane)
-{
-	unsigned long order, iommu_page_size;
-	dma_addr_t min_iova, max_iova;
-
-	struct iommu_domain *domain = iommu_get_domain_for_dev(ane->dev);
-	if (!domain)
-		return -ENODEV;
-	ane->domain = domain;
-
-	order = __ffs(ane->domain->pgsize_bitmap);
-	iommu_page_size = 1UL << order; // 16K
-	if (iommu_page_size != ane->hw->dart.page_size) {
-		pr_err("iommu page size doesn't match dart config\n");
-		return -ENXIO;
-	}
-
-	/* DMA chans can't access iovas past the limit */
-	/* I believe it's a prefetch distance issue */
-	min_iova = ane->hw->dart.vm_base;
-	init_iova_domain(&ane->iovad, iommu_page_size, min_iova >> order);
-	ane->shift = iova_shift(&ane->iovad);
-
-	max_iova = min_iova + ane->hw->dart.vm_size - iommu_page_size;
-	if (!ane->hw->dart.vm_size)
-		max_iova = ane->domain->geometry.aperture_end;
-
-	/* a page before as to not reach real limit */
-	max_iova -= iommu_page_size;
-	ane->limit = max_iova >> iova_shift(&ane->iovad);
-
-	return 0;
-}
-
-static void ane_iommu_domain_free(struct ane_device *ane)
-{
-	put_iova_domain(&ane->iovad);
-	return;
-}
-
 static int ane_iommu_sync_ttbr(struct ane_device *ane)
 {
 	int err = 0;
@@ -871,6 +832,112 @@ unmap_reg:
 	return err;
 }
 
+static void ane_iommu_domain_free(struct ane_device *ane)
+{
+	put_iova_domain(&ane->iovad);
+	return;
+}
+
+static int ane_iommu_domain_init(struct ane_device *ane)
+{
+	unsigned long order, iommu_page_size;
+	dma_addr_t min_iova, max_iova;
+	int err;
+
+	struct iommu_domain *domain = iommu_get_domain_for_dev(ane->dev);
+	if (!domain)
+		return -ENODEV;
+	ane->domain = domain;
+
+	order = __ffs(ane->domain->pgsize_bitmap);
+	iommu_page_size = 1UL << order; // 16K
+	if (iommu_page_size != ane->hw->dart.page_size) {
+		pr_err("iommu page size doesn't match dart config\n");
+		return -ENXIO;
+	}
+
+	/* DMA chans can't access iovas past the limit */
+	/* I believe it's a prefetch distance issue */
+	min_iova = ane->hw->dart.vm_base;
+	init_iova_domain(&ane->iovad, iommu_page_size, min_iova >> order);
+	ane->shift = iova_shift(&ane->iovad);
+
+	max_iova = min_iova + ane->hw->dart.vm_size - iommu_page_size;
+	if (!ane->hw->dart.vm_size)
+		max_iova = ane->domain->geometry.aperture_end;
+
+	/* a page before as to not reach real limit */
+	max_iova -= iommu_page_size;
+	ane->limit = max_iova >> iova_shift(&ane->iovad);
+
+	err = ane_iommu_sync_ttbr(ane);
+	if (err < 0) {
+		dev_err(ane->dev, "failed to sync ttbr\n");
+		ane_iommu_domain_free(ane);
+		return err;
+	}
+
+	return 0;
+}
+
+static void ane_detach_genpd(struct ane_device *ane)
+{
+	int i;
+
+	if (ane->pd_count <= 1)
+		return;
+
+	for (i = ane->pd_count - 1; i >= 0; i--) {
+		if (ane->pd_link[i])
+			device_link_del(ane->pd_link[i]);
+		if (!IS_ERR_OR_NULL(ane->pd_dev[i]))
+			dev_pm_domain_detach(ane->pd_dev[i], true);
+	}
+	return;
+}
+
+static int ane_attach_genpd(struct ane_device *ane)
+{
+	struct device *dev = ane->dev;
+	int i;
+
+	ane->pd_count = of_count_phandle_with_args(
+		dev->of_node, "power-domains", "#power-domain-cells");
+	pr_info("pd_count: %d\n", ane->pd_count);
+
+	if (ane->pd_count <= 1)
+		return 0;
+
+	ane->pd_dev = devm_kcalloc(dev, ane->pd_count, sizeof(*ane->pd_dev),
+				   GFP_KERNEL);
+	if (!ane->pd_dev)
+		return -ENOMEM;
+
+	ane->pd_link = devm_kcalloc(dev, ane->pd_count, sizeof(*ane->pd_link),
+				    GFP_KERNEL);
+	if (!ane->pd_link)
+		return -ENOMEM;
+
+	for (i = 0; i < ane->pd_count; i++) {
+		ane->pd_dev[i] = dev_pm_domain_attach_by_id(dev, i);
+		if (IS_ERR(ane->pd_dev[i])) {
+			ane_detach_genpd(ane);
+			return PTR_ERR(ane->pd_dev[i]);
+		}
+
+		ane->pd_link[i] = device_link_add(dev, ane->pd_dev[i],
+						  DL_FLAG_STATELESS |
+						  DL_FLAG_PM_RUNTIME |
+						  DL_FLAG_RPM_ACTIVE);
+		if (!ane->pd_link[i]) {
+			ane_detach_genpd(ane);
+			return -EINVAL;
+		}
+	}
+
+	return 0;
+}
+
 static int ane_pdev_probe(struct platform_device *pdev)
 {
 	struct ane_device *ane;
@@ -889,63 +956,81 @@ static int ane_pdev_probe(struct platform_device *pdev)
 	drm = &ane->drm;
 	drm->dev_private = ane;
 
-	mutex_init(&ane->iova_lock);
-	mutex_init(&ane->tm_lock);
+	err = ane_attach_genpd(ane);
+	if (err < 0) {
+		dev_err(ane->dev, "failed to attatch power domains\n");
+		return err;
+	}
 
 	ane->irq = platform_get_irq_byname(pdev, "ane");
-	if (ane->irq < 0)
-		return -ENODEV;
+	if (ane->irq < 0){
+		err =  -ENODEV;
+		goto detach_genpd;
+	}
+
 	ane->dart_irq = platform_get_irq_byname(pdev, "dart");
-	if (ane->dart_irq < 0)
-		return -ENODEV;
+	if (ane->dart_irq < 0){
+		err =  -ENODEV;
+		goto detach_genpd;
+	}
 	disable_irq(ane->dart_irq); // sigh
 
 	ane->engine = devm_platform_ioremap_resource_byname(pdev, "engine");
-	if (IS_ERR(ane->engine))
-		return PTR_ERR(ane->engine);
+	if (IS_ERR(ane->engine)){
+		err = PTR_ERR(ane->engine);
+		goto detach_genpd;
+	}
 
 	ane->dart1 = devm_platform_ioremap_resource_byname(pdev, "dart1");
-	if (IS_ERR(ane->dart1))
-		return PTR_ERR(ane->dart1);
+	if (IS_ERR(ane->dart1)){
+		err = PTR_ERR(ane->dart1);
+		goto detach_genpd;
+	}
 
 	ane->dart2 = devm_platform_ioremap_resource_byname(pdev, "dart2");
-	if (IS_ERR(ane->dart2))
-		return PTR_ERR(ane->dart2);
+	if (IS_ERR(ane->dart2)){
+		err = PTR_ERR(ane->dart2);
+		goto detach_genpd;
+	}
 
 	ane->perf = devm_platform_ioremap_resource_byname(pdev, "perf");
-	if (IS_ERR(ane->perf))
-		return PTR_ERR(ane->perf);
+	if (IS_ERR(ane->perf)){
+		err = PTR_ERR(ane->perf);
+		goto detach_genpd;
+	}
 
 	ane->clk = devm_ioremap(ane->dev, ane->hw->base + 0x1170000L,
 				sizeof(u32) * 2);
-	if (IS_ERR(ane->clk))
-		return PTR_ERR(ane->clk);
+	if (IS_ERR(ane->clk)){
+		err = PTR_ERR(ane->clk);
+		goto detach_genpd;
+	}
+
+	mutex_init(&ane->iova_lock);
+	mutex_init(&ane->tm_lock);
 
 	err = ane_iommu_domain_init(ane);
 	if (err < 0) {
 		dev_err(ane->dev, "failed to attatch iommu domain\n");
-		return err;
-	}
-
-	err = ane_iommu_sync_ttbr(ane);
-	if (err < 0) {
-		dev_err(ane->dev, "failed to sync ttbr\n");
-		goto iommu_free;
+		goto detach_genpd;
 	}
 
 	err = ane_tm_init_tqs(ane);
 	if (err < 0)
 		goto iommu_free;
-
+	
 	err = drm_dev_register(drm, 0);
 	if (err < 0)
 		goto iommu_free;
 
 	pr_info("loaded ane!\n");
+
 	return 0;
 
 iommu_free:
 	ane_iommu_domain_free(ane);
+detach_genpd:
+	ane_detach_genpd(ane);
 	return err;
 }
 
@@ -954,6 +1039,7 @@ static int ane_pdev_remove(struct platform_device *pdev)
 	struct ane_device *ane = platform_get_drvdata(pdev);
 	drm_dev_unregister(&ane->drm);
 	ane_iommu_domain_free(ane);
+	ane_detach_genpd(ane);
 	return 0;
 }
 

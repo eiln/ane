@@ -16,6 +16,10 @@ struct ane_device {
 	struct device *dev;
 	const struct ane_hw *hw;
 
+	struct device **pd_dev;
+	struct device_link **pd_link;
+	int pd_count;
+
 	void __iomem *engine;
 	void __iomem *perf;
 	void __iomem *dart1;

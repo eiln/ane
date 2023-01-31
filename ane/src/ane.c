@@ -176,7 +176,7 @@ static int ane_iommu_unmap_node(struct ane_device *ane, struct ane_node *node)
 	mutex_lock(&ane->iova_lock);
 	for (int i = 0; i < node->npages; i++) {
 		dma_addr_t iova = node->iova + (i << ane->shift);
-		iommu_unmap(ane->domain, iova, ane->hw->dart.page_size);
+		iommu_unmap(ane->domain, iova, 1UL << ane->shift);
 	}
 	mutex_unlock(&ane->iova_lock);
 	return 0;
@@ -193,12 +193,10 @@ static int ane_mm_resv_iova(struct ane_device *ane, struct ane_node *node)
 	return 0;
 }
 
-static int ane_mm_unresv_iova(struct ane_device *ane, struct ane_node *node)
+static void ane_mm_unresv_iova(struct ane_device *ane, struct ane_node *node)
 {
-#if 1
 	free_iova(&ane->iovad, iova_pfn(&ane->iovad, node->iova));
-#endif
-	return 0;
+	return;
 }
 
 static void ane_nn_unresv_bar(struct ane_device *ane, struct ane_nn *nn)
@@ -337,7 +335,7 @@ static void ane_nn_unresv_fifo(struct ane_device *ane, struct ane_nn *nn)
 static int ane_nn_validate_args(struct ane_device *ane, struct ane_nn *nn)
 {
 	struct anec *anec = to_anec(nn);
-	int j = 0;
+	int tcount = 0;
 
 	if (!anec->size || !anec->tsk_size || !anec->krn_size ||
 	    !anec->td_size || !anec->td_count) {
@@ -360,13 +358,13 @@ static int ane_nn_validate_args(struct ane_device *ane, struct ane_nn *nn)
 		return -EINVAL;
 	}
 
-	if (!anec->tiles[0] || anec->types[0] != TILE_CMD || anec->tiles[1]) {
-		pr_err("invalid cmd stack\n");
+	if (!IS_ALIGNED(anec->size, ane->hw->dma0_gran)) {
+		pr_err("cmd buf not bank aligned\n");
 		return -EINVAL;
 	}
 
-	if (!IS_ALIGNED(anec->size, ane->hw->dma0_gran)) {
-		pr_err("cmd buf not bank aligned\n");
+	if (!anec->tiles[0] || anec->types[0] != TILE_CMD || anec->tiles[1]) {
+		pr_err("invalid cmd stack\n");
 		return -EINVAL;
 	}
 
@@ -378,8 +376,8 @@ static int ane_nn_validate_args(struct ane_device *ane, struct ane_nn *nn)
 	// clang-format off
 	for (int i = 0; i < MAX_TILE_COUNT; i++) {
 		if (anec->tiles[i]) {
-			nn->tmask[j] = i;
-			j++;
+			nn->tmask[tcount] = i;
+			tcount++;
 		}
 		if (anec->tiles[i] >= 0x10000) {
 			pr_err("tile size exceeds limit\n");
@@ -404,7 +402,7 @@ static int ane_nn_validate_args(struct ane_device *ane, struct ane_nn *nn)
 	}
 	// clang-format on
 
-	nn->tcount = j;
+	nn->tcount = tcount;
 
 	return 0;
 }
@@ -507,9 +505,8 @@ static int ane_nn_deinit(struct drm_device *drm, void *data,
 
 	struct drm_gem_object *gem = drm_gem_object_lookup(file, args->handle);
 	struct ane_nn *nn;
-	if (args->pad || gem == NULL) {
+	if (args->pad || gem == NULL)
 		return -EINVAL;
-	}
 	nn = to_nn(gem);
 
 	ane_nn_unresv_fifo(ane, nn);
@@ -644,7 +641,7 @@ static int ane_nn_sync(struct drm_device *drm, void *data,
 
 	struct ane_device *ane = drm->dev_private;
 	struct drm_ane_nn_sync *args = data;
-	int err;
+	int err = 0;
 
 	struct drm_gem_object *gem = drm_gem_object_lookup(file, args->handle);
 	struct ane_nn *nn;
@@ -719,6 +716,7 @@ static int ane_nn_sync(struct drm_device *drm, void *data,
 			pr_info("BAR %d: 0x%llx\n", i, nn->req.bar[i]);
 		}
 	}
+	
 	nn->mapped = 1;
 
 	return 0;
@@ -999,7 +997,7 @@ static int ane_pdev_probe(struct platform_device *pdev)
 		goto detach_genpd;
 	}
 
-	ane->clk = devm_ioremap(ane->dev, ane->hw->base + 0x1170000L,
+	ane->clk = devm_ioremap(ane->dev, ane->hw->base + 0x1170000UL,
 				sizeof(u32) * 2);
 	if (IS_ERR(ane->clk)){
 		err = PTR_ERR(ane->clk);

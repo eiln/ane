@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+/* Copyright 2022 Eileen Yoon <eyn@gmx.com> */
+
 #ifndef __ANEC_UNARY_H__
 #define __ANEC_UNARY_H__
 

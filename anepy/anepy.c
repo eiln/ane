@@ -4,7 +4,6 @@
 #include <stdio.h>
 
 #include "ane.h"
-#include "anecpy.h"
 
 int anepy_destroy(struct ane_nn *nn)
 {

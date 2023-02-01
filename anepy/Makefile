@@ -2,7 +2,7 @@
 CFLAGS = -I. -Wall -Werror
 LIBS = -I/usr/include/libdrm \
 	-I/home/eileen/ane/ane/src/include \
-	-I/home/eileen/anec \
+	-I/home/eileen/ane/anec \
 	-I/home/eileen/ane/anelib
 
 BUILD_DIR = /home/eileen/ane/build

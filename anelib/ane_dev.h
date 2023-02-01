@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "anec.h"
+#include "anec_base.h" // ane_model base class
 #include "drm_ane.h"
 
 #define ANE_SYSFS_PATH "/dev/dri/renderD129"

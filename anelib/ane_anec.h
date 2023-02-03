@@ -35,31 +35,13 @@ static inline void ane_load_anec(struct ane_nn *nn, void *anec_data)
 	return;
 }
 
-static int ane_init_anec(struct ane_nn *nn)
+static int ane_init_anec_fromp(struct ane_nn *nn, void *anec_data)
 {
-	const struct anec *anec = to_anec(nn);
 	if (!nn->chans[0]) {
 		fprintf(stderr, "channels not initiated\n");
 		return -EINVAL;
 	}
-
-	void *anec_data = ane_zmemalign(anec->size);
-	if (!anec_data) {
-		return -ENOMEM;
-	}
-
-	size_t read =
-		ane_fread(anec_data, anec->size, (char *)nn->model->fname);
-	if (read != anec->size) {
-		fprintf(stderr, "invalid anec backend\n");
-		free(anec_data);
-		return -EINVAL;
-	}
-
 	ane_load_anec(nn, anec_data);
-
-	free(anec_data);
-
 	return 0;
 }
 

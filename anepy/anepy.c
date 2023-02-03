@@ -14,7 +14,7 @@ int anepy_destroy(struct ane_nn *nn)
 void *anepy_exec(struct ane_nn *nn, void *input)
 {
 	int err;
-	ane_write(nn, input, 0);
+	ane_send(nn, input, 0);
 
 	err = ane_exec(nn);
 	if (err) {

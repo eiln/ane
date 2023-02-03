@@ -22,11 +22,6 @@ struct ane_device {
 	int ane_id;
 };
 
-struct ane_tile {
-	void *data;
-	size_t size;
-};
-
 struct ane_nn {
 	struct ane_device *ane;
 	uint32_t handle; // gem handle

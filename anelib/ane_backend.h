@@ -84,7 +84,7 @@ error:
 	return -ENOMEM;
 }
 
-static int ane_inst_backend(struct ane_nn *nn)
+static int ane_inst_backend(struct ane_nn *nn, void *anec_data)
 {
 	int err;
 
@@ -94,7 +94,7 @@ static int ane_inst_backend(struct ane_nn *nn)
 		goto error;
 	}
 
-	err = ane_init_anec(nn); // after chans
+	err = ane_init_anec_fromp(nn, anec_data);
 	if (err) {
 		fprintf(stderr, "failed to load anec backend, 0x%x\n", err);
 		goto free_chans;

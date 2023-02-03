@@ -29,7 +29,7 @@ static void ane_dev_del(struct ane_device *ane)
 	return;
 }
 
-struct ane_nn *ane_register(const struct ane_model *model)
+struct ane_nn *ane_register(const struct ane_model *model, void *anec_data)
 {
 	int err;
 	struct ane_nn *nn = ane_zmalloc(sizeof(struct ane_nn));
@@ -38,7 +38,7 @@ struct ane_nn *ane_register(const struct ane_model *model)
 	}
 	nn->model = model;
 
-	err = ane_inst_backend(nn);
+	err = ane_inst_backend(nn, anec_data);
 	if (err) {
 		fprintf(stderr, "ane_inst_backend failed with 0x%x\n", err);
 		goto free_nn;

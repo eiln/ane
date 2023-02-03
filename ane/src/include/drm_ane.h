@@ -4,8 +4,9 @@
 #ifndef __DRM_ANE_H__
 #define __DRM_ANE_H__
 
-#define MAX_TILE_COUNT 0x20
 #define TILE_SIZE      0x4000
+#define TILE_SHIFT     0xe
+#define MAX_TILE_COUNT 0x20
 
 #define TILE_CMD       0x1
 #define TILE_ITM       0x2

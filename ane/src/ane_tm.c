@@ -150,7 +150,7 @@ static int ane_tm_get_status(struct ane_device *ane)
 	int err;
 	u32 status;
 	err = readl_poll_timeout(ane->engine + ANE_TM_BASE + TM_STATUS, status,
-				 (status & TM_IS_IDLE), 1, 10000);
+				 (status & TM_IS_IDLE), 1, 1000000);
 	if (err)
 		pr_err("tm execution failed w/ %d\n", err);
 	return err;

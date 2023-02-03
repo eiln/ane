@@ -14,7 +14,7 @@
 static inline void set_fifo_nid(void *td, int nid)
 {
 	uint32_t hdr0 = *(uint32_t *)td;
-	hdr0 = (hdr0 & 0xf00ffff) | ((nid << 16));
+	hdr0 = (hdr0 & 0xf00ffff) | (nid << 16);
 	memcpy(td, &hdr0, sizeof(uint32_t));
 	return;
 }
@@ -38,7 +38,7 @@ static inline void ane_load_anec(struct ane_nn *nn, void *anec_data)
 static int ane_init_anec_fromp(struct ane_nn *nn, void *anec_data)
 {
 	if (!nn->chans[0]) {
-		fprintf(stderr, "channels not initiated\n");
+		fprintf(stderr, "ANELIB: channels not initiated\n");
 		return -EINVAL;
 	}
 	ane_load_anec(nn, anec_data);

@@ -274,7 +274,7 @@ static int ane_nn_resv_bar(struct ane_device *ane, struct ane_nn *nn)
 
 	/* 
 	 * The command buffer is the register state descriptor catted with
-	 * the weights data (kernel) @ 64 gran padding. Both are "immutable",
+	 * the weights data (kernel) @ 16 gran padding. Both are "immutable",
 	 * meaning its dedicated DMA channel is a one-way, read-only one.
 	 * 
 	 * Before inputs are even thought of, kernel coefficients are
@@ -350,12 +350,6 @@ static int ane_nn_validate_args(struct ane_device *ane, struct ane_nn *nn)
 
 	if (anec->td_count >= 0xffff) {
 		pr_err("td_count exceeds limit\n");
-		return -EINVAL;
-	}
-
-	if ((((anec->td_count - 1) * roundup(anec->td_size, 0x100)) +
-	     anec->td_size) != anec->tsk_size) {
-		pr_err("invalid tsk size\n");
 		return -EINVAL;
 	}
 
@@ -758,7 +752,6 @@ static int ane_nn_exec(struct drm_device *drm, void *data,
 	 * 
 	 */
 
-	ane_get_time(ane, "scheduling request on engine...\n");
 	mutex_lock(&ane->tm_lock);
 
 	err = ane_tm_enqueue_tq(ane, &nn->req);
@@ -770,7 +763,6 @@ static int ane_nn_exec(struct drm_device *drm, void *data,
 		goto error;
 
 	mutex_unlock(&ane->tm_lock);
-	ane_get_time(ane, "finished execution!\n");
 
 	return 0;
 
@@ -822,8 +814,6 @@ long ane_drm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	struct drm_device *drm = filp->minor->dev;
 	struct ane_device *ane = drm->dev_private;
 	long ret;
-
-	pr_info("inside ioctl\n");
 
 	ret = pm_runtime_resume_and_get(ane->dev);
 	if (ret < 0 && ret != -EACCES) {
@@ -1083,7 +1073,8 @@ static int ane_pdev_probe(struct platform_device *pdev)
 	if (err < 0)
 		goto iommu_free;
 
-	pm_runtime_set_autosuspend_delay(ane->dev, 50);
+	// measured 3sec on macos
+	pm_runtime_set_autosuspend_delay(ane->dev, 3000);
 	pm_runtime_use_autosuspend(ane->dev);
 
 	pm_runtime_get_noresume(&pdev->dev);
@@ -1144,7 +1135,7 @@ static const struct ane_hw ane_hw_t8103 = {
 	.max_ane = 1,
 	.max_ne = 8,
 	.bar_slots = 0x20,
-	.dma0_gran = 0x40,
+	.dma0_gran = 16,
 };
 
 static const struct ane_hw ane_hw_t600x_ane0 = {
@@ -1170,7 +1161,7 @@ static const struct ane_hw ane_hw_t600x_ane0 = {
 	.max_ane = 1,
 	.max_ne = 8,
 	.bar_slots = 0x20,
-	.dma0_gran = 0x40,
+	.dma0_gran = 16,
 };
 
 static const struct ane_hw ane_hw_t600x_ane2 = {
@@ -1196,7 +1187,7 @@ static const struct ane_hw ane_hw_t600x_ane2 = {
 	.max_ane = 1,
 	.max_ne = 8,
 	.bar_slots = 0x20,
-	.dma0_gran = 0x40,
+	.dma0_gran = 16,
 };
 
 static const struct of_device_id ane_pdev_match[] = {
@@ -1209,23 +1200,17 @@ static int __maybe_unused ane_runtime_resume(struct device *dev)
 {
 	struct ane_device *ane = dev_get_drvdata(dev);
 	int err;
-
-	pr_info("test: 0x%x\n", readl(ane->engine));
 	err = ane_tm_init_tqs(ane);
 	if (err < 0){
 		return err;
 	}
-
 	return 0;
 }
 
 static int __maybe_unused ane_runtime_suspend(struct device *dev)
 {
 	struct ane_device *ane = dev_get_drvdata(dev);
-
-	pr_info("test: 0x%x\n", readl(ane->engine));
 	ane_iommu_invalidate_tlb(ane);
-
 	return 0;
 }
 

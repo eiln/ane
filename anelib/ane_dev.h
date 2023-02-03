@@ -4,13 +4,13 @@
 #ifndef __ANE_DEV_H__
 #define __ANE_DEV_H__
 
-#include <asm/types.h> // kernel __u types
+#include <asm/types.h>
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "anec_base.h" // ane_model base class
+#include "ane_model.h"
 #include "drm_ane.h"
 
 #define ANE_SYSFS_PATH "/dev/dri/renderD129"
@@ -32,6 +32,7 @@ struct ane_nn {
 	int omask[MAX_TILE_COUNT];
 };
 
+#define tile_sz(x)	 (x << TILE_SHIFT)
 #define to_anec(nn)	 (&nn->model->anec)
 
 #define input_count(nn)	 (nn->model->input_count)

@@ -9,7 +9,6 @@
 #include <stdint.h>
 
 #include "ane_dev.h"
-#include "ane_fp16.h"
 #include "ane_utils.h"
 
 struct ane_nn *ane_register(const struct ane_model *model, void *anec_data);
@@ -19,8 +18,8 @@ int ane_exec(struct ane_nn *nn);
 #define input_chan(nn, i)  (nn->chans[nn->imask[i]])
 #define output_chan(nn, i) (nn->chans[nn->omask[i]])
 
-#define input_size(nn, i)  (to_anec(nn)->tiles[nn->imask[i]] * TILE_SIZE)
-#define output_size(nn, i) (to_anec(nn)->tiles[nn->omask[i]] * TILE_SIZE)
+#define input_size(nn, i)  (tile_sz(to_anec(nn)->tiles[nn->imask[i]]))
+#define output_size(nn, i) (tile_sz(to_anec(nn)->tiles[nn->omask[i]]))
 
 static inline void ane_send(struct ane_nn *nn, void *input_data, int chan)
 {

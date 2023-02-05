@@ -10,6 +10,7 @@
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/pm_domain.h>
+#include <linux/pm_runtime.h>
 
 #include <drm/drm_drv.h>
 #include <drm/drm_file.h>
@@ -19,7 +20,7 @@
 #include "ane_tm.h"
 #include "include/drm_ane.h"
 
-static int ane_iommu_invalidate_tlb(struct ane_device *ane)
+static void ane_iommu_invalidate_tlb(struct ane_device *ane)
 {
 	/* 
 	 * Figured out exactly 12 minutes ago that TLBs for the other two
@@ -61,7 +62,7 @@ static int ane_iommu_invalidate_tlb(struct ane_device *ane)
 
 	mutex_unlock(&ane->iova_lock);
 
-	return 0;
+	return;
 }
 
 static void ane_mm_free_pages(struct ane_node *node)
@@ -726,6 +727,12 @@ exit:
 	return err;
 }
 
+static int ane_hw_reset(struct ane_device *ane)
+{
+	pr_err("hard resetting to recover\n");
+	return 0;
+}
+
 static int ane_nn_exec(struct drm_device *drm, void *data,
 		       struct drm_file *file)
 {
@@ -769,6 +776,7 @@ static int ane_nn_exec(struct drm_device *drm, void *data,
 
 error: // well shit
 	mutex_unlock(&ane->tm_lock);
+	ane_hw_reset(ane);
 	return err;
 }
 
@@ -781,10 +789,70 @@ static const struct drm_ioctl_desc ane_drm_driver_ioctls[] = {
 	DRM_IOCTL_DEF_DRV(ANE_NN_CHAIN, ane_nn_chain, DRM_RENDER_ALLOW),
 };
 
-DEFINE_DRM_GEM_FOPS(ane_drm_driver_fops);
+static int ane_drm_open(struct drm_device *drm, struct drm_file *file)
+{
+	struct ane_device *ane = drm->dev_private;
+	int ret;
+
+	/* need to bring up power immediately if opening device */
+	ret = pm_runtime_resume_and_get(ane->dev);
+	if (ret < 0 && ret != -EACCES) {
+		pm_runtime_put_autosuspend(ane->dev);
+		return ret;
+	}
+
+	pm_runtime_mark_last_busy(ane->dev);
+	pm_runtime_put_autosuspend(ane->dev);
+	return ret;
+}
+
+static void ane_drm_postclose(struct drm_device *drm, struct drm_file *file)
+{
+	struct ane_device *ane = drm->dev_private;
+	pm_runtime_resume_and_get(ane->dev);
+
+	pm_runtime_mark_last_busy(ane->dev);
+	pm_runtime_put_autosuspend(ane->dev);
+	return;
+}
+
+long ane_drm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	struct drm_file *filp = file->private_data;
+	struct drm_device *drm = filp->minor->dev;
+	struct ane_device *ane = drm->dev_private;
+	long ret;
+
+	pr_info("inside ioctl\n");
+
+	ret = pm_runtime_resume_and_get(ane->dev);
+	if (ret < 0 && ret != -EACCES) {
+		pm_runtime_put_autosuspend(ane->dev);
+		return ret;
+	}
+
+	ret = drm_ioctl(file, cmd, arg);
+
+	pm_runtime_mark_last_busy(ane->dev);
+	pm_runtime_put_autosuspend(ane->dev);
+	return ret;
+}
+
+static const struct file_operations ane_drm_driver_fops = {
+	.owner = THIS_MODULE,
+	.open = drm_open,
+	.release = drm_release,
+	.unlocked_ioctl = ane_drm_ioctl,
+	.mmap = drm_gem_mmap,
+	.poll = drm_poll,
+	.read = drm_read,
+	.llseek = noop_llseek,
+};
 
 static const struct drm_driver ane_drm_driver = {
 	.driver_features = DRIVER_GEM | DRIVER_RENDER,
+	.open = ane_drm_open,
+	.postclose = ane_drm_postclose,
 	.ioctls = ane_drm_driver_ioctls,
 	.num_ioctls = ARRAY_SIZE(ane_drm_driver_ioctls),
 	.fops = &ane_drm_driver_fops,
@@ -901,8 +969,6 @@ static int ane_attach_genpd(struct ane_device *ane)
 
 	ane->pd_count = of_count_phandle_with_args(
 		dev->of_node, "power-domains", "#power-domain-cells");
-	pr_info("pd_count: %d\n", ane->pd_count);
-
 	if (ane->pd_count <= 1)
 		return 0;
 
@@ -1013,13 +1079,19 @@ static int ane_pdev_probe(struct platform_device *pdev)
 		goto detach_genpd;
 	}
 
-	err = ane_tm_init_tqs(ane);
-	if (err < 0)
-		goto iommu_free;
-	
 	err = drm_dev_register(drm, 0);
 	if (err < 0)
 		goto iommu_free;
+
+	pm_runtime_set_autosuspend_delay(ane->dev, 50);
+	pm_runtime_use_autosuspend(ane->dev);
+
+	pm_runtime_get_noresume(&pdev->dev);
+	pm_runtime_set_active(&pdev->dev);
+	pm_runtime_enable(&pdev->dev);
+
+	pm_runtime_mark_last_busy(&pdev->dev);
+	pm_runtime_put_autosuspend(&pdev->dev);
 
 	pr_info("loaded ane!\n");
 
@@ -1035,6 +1107,8 @@ detach_genpd:
 static int ane_pdev_remove(struct platform_device *pdev)
 {
 	struct ane_device *ane = platform_get_drvdata(pdev);
+	pm_runtime_disable(&pdev->dev);
+	pm_runtime_dont_use_autosuspend(&pdev->dev);
 	drm_dev_unregister(&ane->drm);
 	ane_iommu_domain_free(ane);
 	ane_detach_genpd(ane);
@@ -1131,6 +1205,34 @@ static const struct of_device_id ane_pdev_match[] = {
 };
 MODULE_DEVICE_TABLE(of, ane_pdev_match);
 
+static int __maybe_unused ane_runtime_resume(struct device *dev)
+{
+	struct ane_device *ane = dev_get_drvdata(dev);
+	int err;
+
+	pr_info("test: 0x%x\n", readl(ane->engine));
+	err = ane_tm_init_tqs(ane);
+	if (err < 0){
+		return err;
+	}
+
+	return 0;
+}
+
+static int __maybe_unused ane_runtime_suspend(struct device *dev)
+{
+	struct ane_device *ane = dev_get_drvdata(dev);
+
+	pr_info("test: 0x%x\n", readl(ane->engine));
+	ane_iommu_invalidate_tlb(ane);
+
+	return 0;
+}
+
+static const struct dev_pm_ops ane_pm_ops = {
+	SET_RUNTIME_PM_OPS(ane_runtime_suspend, ane_runtime_resume, NULL)
+};
+
 static struct platform_driver ane_pdev_driver = {
     .probe  = ane_pdev_probe,
     .remove = ane_pdev_remove,
@@ -1138,6 +1240,7 @@ static struct platform_driver ane_pdev_driver = {
 	{
 	    .name	    = "ane",
 	    .owner	    = THIS_MODULE,
+	    .pm             = pm_ptr(&ane_pm_ops),
 	    .of_match_table = ane_pdev_match,
 	},
 };

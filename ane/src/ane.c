@@ -256,16 +256,10 @@ static int ane_nn_resv_bar(struct ane_device *ane, struct ane_nn *nn)
 		tile->type = anec->types[bdx];
 		node->npages = anec->tiles[bdx];
 
-		if (tile->type != TILE_SRC_CHAIN) {
-			err = ane_mm_resv_iova(ane, node);
-			if (err < 0) {
-				pr_err("failed to reserve iova\n");
-				goto unresv_bar;
-			}
-		} else {
-			pr_info("found chained DRAM dependency @ src %d\n",
-				bdx);
-			node->iova = 0;
+		err = ane_mm_resv_iova(ane, node);
+		if (err < 0) {
+			pr_err("failed to reserve iova\n");
+			goto unresv_bar;
 		}
 		nn->req.bar[bdx] = node->iova;
 	}
@@ -388,9 +382,7 @@ static int ane_nn_validate_args(struct ane_device *ane, struct ane_nn *nn)
 		    anec->types[i] != TILE_CMD &&
 		    anec->types[i] != TILE_ITM && 
 		    anec->types[i] != TILE_SRC &&
-		    anec->types[i] != TILE_DST &&
-		    anec->types[i] != TILE_DST_CHAIN &&
-		    anec->types[i] != TILE_SRC_CHAIN) {
+		    anec->types[i] != TILE_DST) {
 			pr_err("invalid tile type\n");
 			return -EINVAL;
 		}
@@ -515,57 +507,6 @@ static int ane_nn_deinit(struct drm_device *drm, void *data,
 	return 0;
 }
 
-static int ane_nn_chain(struct drm_device *drm, void *data,
-			struct drm_file *file)
-{
-	/* Not done. At all. Nothing to see. */
-	struct drm_ane_nn_chain *args = data;
-	struct drm_gem_object *gem;
-	struct ane_nn *nn, *nxt;
-	int err = 0;
-
-	gem = drm_gem_object_lookup(file, args->handle);
-	if (gem == NULL)
-		return -EINVAL;
-	nn = to_nn(gem);
-
-	gem = drm_gem_object_lookup(file, args->handle_nxt);
-	if (gem == NULL)
-		return -EINVAL;
-	nxt = to_nn(gem);
-
-	for (int i = 0; i < MAX_TILE_COUNT; i++) {
-		if (args->chain[i]) {
-			struct ane_tile *prev, *next;
-			if (args->chain[i] >= MAX_TILE_COUNT || i <= 3 ||
-			    args->chain[i] <= 3) { // itm bdx base
-				err = -EINVAL;
-				goto error;
-			}
-			prev = nn->tiles[i];
-			next = nxt->tiles[args->chain[i]];
-
-			if (!to_tnode(prev)->iova || to_tnode(next)->iova) {
-				pr_err("prev not reserved or next reserved\n");
-				err = -EINVAL;
-				goto error;
-			}
-#if 0 
-			// if we only copy the iova to BAR, which is what
-			// actually ends up in the hardware, the noopd
-			// dependency can be faked somewhat
-			nxt->req.bar[args->chain[i]] = nn->req.bar[i];
-			
-			// cool msg so it looks like i'm doing something
-			pr_info("chaining dst %d to src %d @ iova 0x%llx\n", i,
-				args->chain[i], nxt->req.bar[args->chain[i]]);
-#endif
-		}
-	}
-error:
-	return err;
-}
-
 static int __ane_nn_unsync(struct ane_device *ane, struct ane_nn *nn)
 {
 	if (!nn->mapped) {
@@ -577,18 +518,14 @@ static int __ane_nn_unsync(struct ane_device *ane, struct ane_nn *nn)
 		struct ane_tile *tile = nn->tiles[bdx];
 		struct ane_node *node = to_tnode(tile);
 
-		if (tile->type == TILE_ITM || tile->type == TILE_DST_CHAIN) {
+		if (tile->type == TILE_ITM) {
 			ane_mm_free_pages(node);
 		} else if (tile->type == TILE_CMD || tile->type == TILE_SRC ||
 			   tile->type == TILE_DST) {
 			ane_mm_free_user_pages(node);
-		} else if (tile->type == TILE_SRC_CHAIN) {
-			;
 		}
 
-		if (tile->type != TILE_SRC_CHAIN) {
-			ane_iommu_unmap_node(ane, node);
-		}
+		ane_iommu_unmap_node(ane, node);
 	}
 
 	ane_mm_free_user_pages(nn->fifo_node);
@@ -660,7 +597,7 @@ static int ane_nn_sync(struct drm_device *drm, void *data,
 		 * Back with alloc_page() & keep it in here.
 		 * 
 		 */
-		if (tile->type == TILE_ITM || tile->type == TILE_DST_CHAIN) {
+		if (tile->type == TILE_ITM) {
 			if (args->userptrs[bdx]) {
 				err = -EINVAL;
 				goto exit;
@@ -674,8 +611,6 @@ static int ane_nn_sync(struct drm_device *drm, void *data,
 			}
 			node->userptr = args->userptrs[bdx];
 			err = ane_mm_get_user_pages(node);
-		} else if (tile->type == TILE_SRC_CHAIN) {
-			;
 		}
 
 		if (err) {
@@ -683,10 +618,7 @@ static int ane_nn_sync(struct drm_device *drm, void *data,
 			goto exit;
 		}
 
-		if (tile->type != TILE_SRC_CHAIN) {
-			err = ane_iommu_map_node(ane, node);
-		}
-
+		err = ane_iommu_map_node(ane, node);
 		if (err) {
 			pr_err("failed to map pages to device space\n");
 			goto exit;
@@ -711,7 +643,7 @@ static int ane_nn_sync(struct drm_device *drm, void *data,
 			pr_info("BAR %d: 0x%llx\n", i, nn->req.bar[i]);
 		}
 	}
-	
+
 	nn->mapped = 1;
 
 	return 0;
@@ -778,7 +710,6 @@ static const struct drm_ioctl_desc ane_drm_driver_ioctls[] = {
 	DRM_IOCTL_DEF_DRV(ANE_NN_SYNC, ane_nn_sync, DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(ANE_NN_UNSYNC, ane_nn_unsync, DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(ANE_NN_EXEC, ane_nn_exec, DRM_RENDER_ALLOW),
-	DRM_IOCTL_DEF_DRV(ANE_NN_CHAIN, ane_nn_chain, DRM_RENDER_ALLOW),
 };
 
 static int ane_drm_open(struct drm_device *drm, struct drm_file *file)
@@ -979,10 +910,10 @@ static int ane_attach_genpd(struct ane_device *ane)
 			return PTR_ERR(ane->pd_dev[i]);
 		}
 
-		ane->pd_link[i] = device_link_add(dev, ane->pd_dev[i],
-						  DL_FLAG_STATELESS |
-						  DL_FLAG_PM_RUNTIME |
-						  DL_FLAG_RPM_ACTIVE);
+		ane->pd_link[i] =
+			device_link_add(dev, ane->pd_dev[i],
+					DL_FLAG_STATELESS | DL_FLAG_PM_RUNTIME |
+						DL_FLAG_RPM_ACTIVE);
 		if (!ane->pd_link[i]) {
 			ane_detach_genpd(ane);
 			return -EINVAL;
@@ -1017,45 +948,45 @@ static int ane_pdev_probe(struct platform_device *pdev)
 	}
 
 	ane->irq = platform_get_irq_byname(pdev, "ane");
-	if (ane->irq < 0){
-		err =  -ENODEV;
+	if (ane->irq < 0) {
+		err = -ENODEV;
 		goto detach_genpd;
 	}
 
 	ane->dart_irq = platform_get_irq_byname(pdev, "dart");
-	if (ane->dart_irq < 0){
-		err =  -ENODEV;
+	if (ane->dart_irq < 0) {
+		err = -ENODEV;
 		goto detach_genpd;
 	}
 	disable_irq(ane->dart_irq); // sigh
 
 	ane->engine = devm_platform_ioremap_resource_byname(pdev, "engine");
-	if (IS_ERR(ane->engine)){
+	if (IS_ERR(ane->engine)) {
 		err = PTR_ERR(ane->engine);
 		goto detach_genpd;
 	}
 
 	ane->dart1 = devm_platform_ioremap_resource_byname(pdev, "dart1");
-	if (IS_ERR(ane->dart1)){
+	if (IS_ERR(ane->dart1)) {
 		err = PTR_ERR(ane->dart1);
 		goto detach_genpd;
 	}
 
 	ane->dart2 = devm_platform_ioremap_resource_byname(pdev, "dart2");
-	if (IS_ERR(ane->dart2)){
+	if (IS_ERR(ane->dart2)) {
 		err = PTR_ERR(ane->dart2);
 		goto detach_genpd;
 	}
 
 	ane->perf = devm_platform_ioremap_resource_byname(pdev, "perf");
-	if (IS_ERR(ane->perf)){
+	if (IS_ERR(ane->perf)) {
 		err = PTR_ERR(ane->perf);
 		goto detach_genpd;
 	}
 
 	ane->clk = devm_ioremap(ane->dev, ane->hw->base + 0x1170000UL,
 				sizeof(u32) * 2);
-	if (IS_ERR(ane->clk)){
+	if (IS_ERR(ane->clk)) {
 		err = PTR_ERR(ane->clk);
 		goto detach_genpd;
 	}
@@ -1201,7 +1132,7 @@ static int __maybe_unused ane_runtime_resume(struct device *dev)
 	struct ane_device *ane = dev_get_drvdata(dev);
 	int err;
 	err = ane_tm_init_tqs(ane);
-	if (err < 0){
+	if (err < 0) {
 		return err;
 	}
 	return 0;
@@ -1214,9 +1145,8 @@ static int __maybe_unused ane_runtime_suspend(struct device *dev)
 	return 0;
 }
 
-static const struct dev_pm_ops ane_pm_ops = {
-	SET_RUNTIME_PM_OPS(ane_runtime_suspend, ane_runtime_resume, NULL)
-};
+static const struct dev_pm_ops ane_pm_ops = { SET_RUNTIME_PM_OPS(
+	ane_runtime_suspend, ane_runtime_resume, NULL) };
 
 static struct platform_driver ane_pdev_driver = {
     .probe  = ane_pdev_probe,

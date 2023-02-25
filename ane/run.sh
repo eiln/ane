@@ -5,10 +5,10 @@ function logs(){
 }
 
 function status(){
-	kstat=$(lsmod | grep "ane" | head -n1 | awk '{print $1;}')
-	if [ "$kstat" = "ane" ]; then
+	kstat=$(lsmod | grep "^ane ")
+	if [ -n "$kstat" ]; then
 		lsmod | head -n1 # header
-		lsmod | grep "ane"
+		echo "$kstat"
 		echo "module is installed"
 	else
 		echo "module NOT installed"
@@ -16,9 +16,9 @@ function status(){
 }
 
 function uninstall(){
-	kstat=$(lsmod | grep "ane" | head -n1 | awk '{print $1;}')
-	if [ "$kstat" = "ane" ]; then
-		make uninstall 
+	kstat=$(lsmod | grep "^ane ")
+	if [ -n "$kstat" ]; then
+		make uninstall
 		echo "uninstalled module"
 	else
 		echo "module NOT installed"
@@ -26,8 +26,8 @@ function uninstall(){
 }
 
 function install(){
-	kstat=$(lsmod | grep "ane" | head -n1 | awk '{print $1;}')
-	if [ "$kstat" = "ane" ]; then
+	kstat=$(lsmod | grep "^ane ")
+	if [ -n "$kstat" ]; then
 		echo "already installed; removing then re-installing"
 		make uninstall && make && make install
 		logs

@@ -4,18 +4,17 @@
 #ifndef __ANE_BACKEND_H__
 #define __ANE_BACKEND_H__
 
-#define ANE_FIFO_WIDTH 0x400 // nxtpow2(0x274)
-#define ANE_FIFO_COUNT 0x20
+#define FIFO_WIDTH 0x400 // nxtpow2(0x274)
+#define FIFO_COUNT 0x20
 
 static inline void set_fifo_nid(void *td, int nid)
 {
 	uint32_t hdr0 = *(uint32_t *)td;
 	hdr0 = (hdr0 & 0xf00ffff) | (nid << 16);
 	memcpy(td, &hdr0, sizeof(uint32_t));
-	return;
 }
 
-static inline void ane_load_anec(struct ane_nn *nn, void *anec_data)
+static void ane_load_anec(struct ane_nn *nn, void *anec_data)
 {
 	const struct anec *anec = to_anec(nn);
 
@@ -23,15 +22,13 @@ static inline void ane_load_anec(struct ane_nn *nn, void *anec_data)
 
 	/* do not fucking overflow */
 	memcpy(nn->fifo_chan, anec_data, anec->td_size);
-	memcpy(nn->fifo_chan + ANE_FIFO_WIDTH, anec_data, anec->td_size);
+	memcpy(nn->fifo_chan + FIFO_WIDTH, anec_data, anec->td_size);
 
 	set_fifo_nid(nn->fifo_chan, FIFO_NID_MAGIC);
-	set_fifo_nid(nn->fifo_chan + ANE_FIFO_WIDTH,
-		     FIFO_NID_MAGIC + ANE_FIFO_COUNT);
-	return;
+	set_fifo_nid(nn->fifo_chan + FIFO_WIDTH, FIFO_NID_MAGIC + FIFO_COUNT);
 }
 
-static int ane_free_chans(struct ane_nn *nn)
+static void ane_free_chans(struct ane_nn *nn)
 {
 	for (int i = 0; i < input_count(nn); i++) {
 		int bdx = nn->imask[i];
@@ -39,17 +36,17 @@ static int ane_free_chans(struct ane_nn *nn)
 			free(nn->chans[bdx]);
 		}
 	}
+
 	for (int i = 0; i < output_count(nn); i++) {
 		int bdx = nn->omask[i];
 		if (nn->chans[bdx]) {
 			free(nn->chans[bdx]);
 		}
 	}
+
 	if (nn->fifo_chan) {
 		free(nn->fifo_chan);
-		nn->fifo_chan = NULL;
 	}
-	return 0;
 }
 
 static int ane_alloc_chans(struct ane_nn *nn)
@@ -113,9 +110,7 @@ error:
 
 static int ane_inst_backend(struct ane_nn *nn, void *anec_data)
 {
-	int err;
-
-	err = ane_alloc_chans(nn);
+	int err = ane_alloc_chans(nn);
 	if (err) {
 		fprintf(stderr, "ANELIB: failed to alloc chans, 0x%x\n", err);
 		return err;

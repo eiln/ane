@@ -24,7 +24,7 @@ static inline void *ane_zmemalign(size_t size)
 {
 	void *src = ane_memalign(size);
 	if (src == NULL) {
-		return src;
+		return NULL;
 	}
 	memset(src, 0, size);
 	return src;
@@ -34,7 +34,7 @@ static inline void *ane_zmalloc(size_t size)
 {
 	void *src = malloc(size);
 	if (src == NULL) {
-		return src;
+		return NULL;
 	}
 	memset(src, 0, size);
 	return src;
@@ -45,7 +45,7 @@ static inline size_t ane_fread(void *src, size_t size, char *fpath)
 	FILE *infp = fopen(fpath, "rb");
 	if (!infp) {
 		fprintf(stderr, "ANELIB: failed to open file %s\n", fpath);
-		return -1;
+		return -EINVAL;
 	}
 	size_t read = fread(src, 1, size, infp);
 	fclose(infp);
@@ -63,7 +63,7 @@ static inline size_t ane_fwrite(void *src, size_t size, char *fpath)
 	FILE *outfp = fopen(fpath, "wb");
 	if (!outfp) {
 		fprintf(stderr, "ANELIB: failed to open file %s\n", fpath);
-		return -1;
+		return -EINVAL;
 	}
 	size_t wrote = fwrite(src, 1, size, outfp);
 	fclose(outfp);

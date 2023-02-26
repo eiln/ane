@@ -6,8 +6,8 @@
 
 #include "ane.h"
 
-int ane_tm_init_tqs(struct ane_device *ane);
-int ane_tm_enqueue_tq(struct ane_device *ane, struct ane_engine_req *req);
-int ane_tm_execute_tq(struct ane_device *ane, struct ane_engine_req *req);
+void ane_tm_enable(struct ane_device *ane);
+int ane_tm_enqueue(struct ane_device *ane, struct ane_engine_req *req);
+int ane_tm_execute(struct ane_device *ane, struct ane_engine_req *req);
 
 #endif /* __ANE_TM_H__ */

@@ -23,6 +23,7 @@ struct anec {
 	__u32 types[MAX_TILE_COUNT];
 };
 
+#define CMD_GRAN	  16
 #define FIFO_NID_MAGIC	  0x40
 
 #define DRM_ANE_NN_INIT	  0x1
@@ -34,7 +35,7 @@ struct anec {
 struct drm_ane_nn_init {
 	__u32 handle;
 	__u32 pad;
-	__u64 anecs_userptr;
+	__u64 anec_userptr;
 };
 
 struct drm_ane_nn_deinit {
@@ -45,7 +46,7 @@ struct drm_ane_nn_deinit {
 struct drm_ane_nn_sync {
 	__u32 handle;
 	__u32 pad;
-	__u64 userptrs[MAX_TILE_COUNT];
+	__u64 tile_userptr[MAX_TILE_COUNT];
 	__u64 fifo_userptr;
 };
 

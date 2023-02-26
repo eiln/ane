@@ -5,13 +5,13 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-#include <drm.h> // libdrm
+#include <drm.h>
 #include "drm_ane.h"
 
 #include "ane_drv.h"
 
-/* ane_drv_* funcs interface with the driver.
- * all take *ane and return status.
+/* ane_drv_ funcs interface with the driver.
+ * all take *ane and return int status.
  */
 
 int ane_drv_device_open(struct ane_device *ane)
@@ -35,35 +35,27 @@ int ane_drv_device_close(struct ane_device *ane)
 static int ane_drv_nn_init(struct ane_device *ane, struct ane_nn *nn)
 {
 	struct drm_ane_nn_init args = {
-		.anecs_userptr = (uint64_t)(to_anec(nn)),
+		.anec_userptr = (uint64_t)(to_anec(nn)),
 	};
-
 	int err = ioctl(ane->fd, DRM_IOCTL_ANE_NN_INIT, &args);
-	if (err) {
-		return err;
-	}
 	nn->handle = args.handle;
-	return 0;
+	return err;
 }
 
 static int ane_drv_nn_deinit(struct ane_device *ane, struct ane_nn *nn)
 {
 	struct drm_ane_nn_deinit args = { .handle = nn->handle };
-	int err = ioctl(ane->fd, DRM_IOCTL_ANE_NN_DEINIT, &args);
-	return err;
+	return ioctl(ane->fd, DRM_IOCTL_ANE_NN_DEINIT, &args);
 }
 
 static int ane_drv_nn_sync(struct ane_device *ane, struct ane_nn *nn)
 {
-	int err;
 	struct drm_ane_nn_sync args = { .handle = nn->handle };
 	for (int i = 0; i < MAX_TILE_COUNT; i++) {
-		args.userptrs[i] = (uint64_t)nn->chans[i];
+		args.tile_userptr[i] = (uint64_t)nn->chans[i];
 	}
 	args.fifo_userptr = (uint64_t)nn->fifo_chan;
-
-	err = ioctl(ane->fd, DRM_IOCTL_ANE_NN_SYNC, &args);
-	return err;
+	return ioctl(ane->fd, DRM_IOCTL_ANE_NN_SYNC, &args);
 }
 
 static int ane_drv_nn_unsync(struct ane_device *ane, struct ane_nn *nn)
@@ -74,37 +66,28 @@ static int ane_drv_nn_unsync(struct ane_device *ane, struct ane_nn *nn)
 
 int ane_drv_nn_register(struct ane_device *ane, struct ane_nn *nn)
 {
-	// nn_init + nn_sync
-	// it really should be a single ioctl call
-	// but it makes the args way too complex
-
 	int err;
 
 	err = ane_drv_nn_init(ane, nn);
 	if (err) {
 		fprintf(stderr, "ANELIB: ane_drv_nn_init failed with 0x%x\n",
 			err);
-		goto exit;
+		return err;
 	}
 
 	err = ane_drv_nn_sync(ane, nn);
 	if (err) {
 		fprintf(stderr, "ANELIB: ane_drv_nn_sync failed with 0x%x\n",
 			err);
-		goto nn_deinit;
+		ane_drv_nn_deinit(ane, nn);
+		return err;
 	}
 
 	return 0;
-
-nn_deinit:
-	ane_drv_nn_deinit(ane, nn);
-exit:
-	return err;
 }
 
 int ane_drv_nn_unregister(struct ane_device *ane, struct ane_nn *nn)
 {
-	// nn_deinit + nn_unsync
 	int err = 0;
 	err |= ane_drv_nn_unsync(ane, nn);
 	err |= ane_drv_nn_deinit(ane, nn);

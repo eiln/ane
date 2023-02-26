@@ -24,13 +24,11 @@ int ane_exec(struct ane_nn *nn);
 static inline void ane_send(struct ane_nn *nn, void *input_data, int chan)
 {
 	memcpy(input_chan(nn, chan), input_data, input_size(nn, chan));
-	return;
 }
 
 static inline void ane_read(struct ane_nn *nn, void *output_data, int chan)
 {
 	memcpy(output_data, output_chan(nn, chan), output_size(nn, chan));
-	return;
 }
 
 #endif /* __ANE_H__ */

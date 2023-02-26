@@ -24,11 +24,11 @@ struct ane_device {
 
 struct ane_nn {
 	struct ane_device *ane;
-	uint32_t handle; // gem handle
-	const struct ane_model *model; // anec backend
-	void *chans[MAX_TILE_COUNT]; // mapped to ane space
-	void *fifo_chan; // mapped to ane space
-	int imask[MAX_TILE_COUNT]; // convinience bdx masks
+	uint32_t handle;
+	const struct ane_model *model;
+	void *chans[MAX_TILE_COUNT];
+	void *fifo_chan;
+	int imask[MAX_TILE_COUNT];
 	int omask[MAX_TILE_COUNT];
 };
 

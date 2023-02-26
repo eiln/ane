@@ -10,7 +10,7 @@ static struct ane_device *ane_dev_new(void)
 	int err;
 	struct ane_device *ane = ane_zmalloc(sizeof(struct ane_device));
 	if (!ane) {
-		return ane;
+		return NULL;
 	}
 
 	err = ane_drv_device_open(ane);
@@ -27,7 +27,6 @@ static void ane_dev_del(struct ane_device *ane)
 {
 	ane_drv_device_close(ane);
 	free(ane);
-	return;
 }
 
 struct ane_nn *ane_register(const struct ane_model *model, void *anec_data)
@@ -47,24 +46,24 @@ struct ane_nn *ane_register(const struct ane_model *model, void *anec_data)
 	}
 
 	/* now call driver to init nn */
-	struct ane_device *ane = ane_dev_new();
-	if (ane == NULL) {
+	nn->ane = ane_dev_new();
+	if (nn->ane == NULL) {
 		goto free_backend;
 	}
-	nn->ane = ane;
 
-	err = ane_drv_nn_register(ane, nn);
+	err = ane_drv_nn_register(nn->ane, nn);
 	if (err) {
 		fprintf(stderr,
 			"ANELIB: ane_drv_nn_register failed with 0x%x\n", err);
 		goto dev_del;
 	}
 
-	printf("ANELIB: registered nn %d\n", nn->handle);
+	printf("ANELIB: registered nn %p\n", (void *)nn);
+
 	return nn;
 
 dev_del:
-	ane_dev_del(ane);
+	ane_dev_del(nn->ane);
 free_backend:
 	ane_free_backend(nn);
 free_nn:
@@ -74,12 +73,11 @@ free_nn:
 
 void ane_destroy(struct ane_nn *nn)
 {
-	printf("ANELIB: destroying nn %d\n", nn->handle);
+	printf("ANELIB: destroying nn %p\n", (void *)nn);
 	ane_drv_nn_unregister(nn->ane, nn);
 	ane_dev_del(nn->ane);
 	ane_free_backend(nn);
 	free(nn);
-	return;
 }
 
 int ane_exec(struct ane_nn *nn)

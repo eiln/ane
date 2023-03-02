@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 /* Copyright 2022 Eileen Yoon <eyn@gmx.com> */
 
-#include "ane.h"
-#include "ane_backend.h"
+#include "ane_chan.h"
+#include "ane_dev.h"
 #include "ane_drv.h"
+#include "ane_utils.h"
 
 static struct ane_device *ane_dev_new(void)
 {
@@ -29,7 +30,7 @@ static void ane_dev_del(struct ane_device *ane)
 	free(ane);
 }
 
-struct ane_nn *ane_register(const struct ane_model *model, void *anec_data)
+struct ane_nn *ane_init(const struct ane_model *model, void *cmd_data)
 {
 	int err;
 	struct ane_nn *nn = ane_zmalloc(sizeof(struct ane_nn));
@@ -38,9 +39,9 @@ struct ane_nn *ane_register(const struct ane_model *model, void *anec_data)
 	}
 	nn->model = model;
 
-	err = ane_inst_backend(nn, anec_data);
+	err = ane_chan_init(nn, cmd_data);
 	if (err) {
-		fprintf(stderr, "ANELIB: ane_inst_backend failed with 0x%x\n",
+		fprintf(stderr, "ANELIB: ane_chan_init failed with 0x%x\n",
 			err);
 		goto free_nn;
 	}
@@ -48,7 +49,7 @@ struct ane_nn *ane_register(const struct ane_model *model, void *anec_data)
 	/* now call driver to init nn */
 	nn->ane = ane_dev_new();
 	if (nn->ane == NULL) {
-		goto free_backend;
+		goto chan_free;
 	}
 
 	err = ane_drv_nn_register(nn->ane, nn);
@@ -58,25 +59,25 @@ struct ane_nn *ane_register(const struct ane_model *model, void *anec_data)
 		goto dev_del;
 	}
 
-	printf("ANELIB: registered nn %p\n", (void *)nn);
+	printf("ANELIB: initialized nn %p\n", (void *)nn);
 
 	return nn;
 
 dev_del:
 	ane_dev_del(nn->ane);
-free_backend:
-	ane_free_backend(nn);
+chan_free:
+	ane_chan_free(nn);
 free_nn:
 	free(nn);
 	return NULL;
 }
 
-void ane_destroy(struct ane_nn *nn)
+void ane_free(struct ane_nn *nn)
 {
-	printf("ANELIB: destroying nn %p\n", (void *)nn);
+	printf("ANELIB: freeing nn %p\n", (void *)nn);
 	ane_drv_nn_unregister(nn->ane, nn);
 	ane_dev_del(nn->ane);
-	ane_free_backend(nn);
+	ane_chan_free(nn);
 	free(nn);
 }
 

@@ -4,10 +4,8 @@
 #ifndef __ANE_H__
 #define __ANE_H__
 
-#include <linux/iova.h>
 #include <drm/drm_device.h>
-
-struct ane_hw;
+#include <drm/drm_mm.h>
 
 struct ane_device {
 	struct drm_device drm;
@@ -19,14 +17,12 @@ struct ane_device {
 	int pd_count;
 
 	void __iomem *engine;
-	void __iomem *perf;
 	void __iomem *dart1;
 	void __iomem *dart2;
 
+	struct drm_mm mm;
 	struct iommu_domain *domain;
-	struct iova_domain iovad;
 	unsigned long shift;
-	unsigned long limit;
 
 	int irq;
 	int dart_irq;
@@ -48,25 +44,25 @@ struct ane_hw {
 		u64 dart1;
 		u64 dart2;
 		u64 dapf;
-		u32 page_size;
 		u64 vm_base;
 		u64 vm_size;
+		u32 page_size;
 		u32 ttbr;
 		u32 sel;
 		u32 cmd;
-		u32 invalidate;
+		u32 inv;
 	} dart;
 };
 
-#define ANE_BAR_SLOTS 0x20 // same as MAX_TILE_COUNT
+#define ANE_BAR_SLOTS 0x20 // same as ANE_TILE_COUNT
 
 struct ane_engine_req {
 	int qid;
-	int nid;
+	u32 nid;
 	u32 td_size;
 	u32 td_count;
-	dma_addr_t fifo_addr;
-	dma_addr_t bar[ANE_BAR_SLOTS];
+	u32 fifo_addr;
+	u32 bar[ANE_BAR_SLOTS];
 };
 
 #endif /* __ANE_H__ */

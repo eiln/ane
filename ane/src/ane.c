@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only OR MIT
 /* Copyright 2022 Eileen Yoon <eyn@gmx.com> */
-/* IOMMU portions based on iommu/apple-dart.c & gpu/drm/tegra/drm.c */
+/* IOMMU portions based on gpu/drm/tegra/drm.c */
 
 #define pr_fmt(fmt) "%s: %s: " fmt, KBUILD_MODNAME, __func__
 
@@ -13,7 +13,7 @@
 #include <linux/pm_runtime.h>
 
 #include <drm/drm_drv.h>
-#include <drm/drm_file.h>
+#include <drm/drm_file.h> // <drm/drm_accel.h>
 #include <drm/drm_gem.h>
 #include <drm/drm_ioctl.h>
 
@@ -21,83 +21,39 @@
 #include "ane_tm.h"
 #include "include/drm_ane.h"
 
+/* device-continuous object */
 struct ane_node {
+	struct drm_mm_node *mm;
 	u32 npages;
 	struct page **pages;
 	dma_addr_t iova;
 	u64 userptr;
-};
-
-struct ane_tile {
-	struct ane_node node;
 	u32 type;
 };
 
+/* neural network */
 struct ane_nn {
 	struct drm_gem_object base;
 	struct ane_engine_req req;
-	struct anec *anecp;
-	struct ane_tile *tiles[ANE_BAR_SLOTS];
-	struct ane_node *fifo_node;
-	int tmask[ANE_BAR_SLOTS];
-	int tcount;
-	unsigned int mapped;
+	struct anec anec;
+	struct ane_node tiles[ANE_TILE_COUNT];
+	struct ane_node fifo;
+	int tile_bdx[ANE_TILE_COUNT];
+	int tile_count;
+	int mapped;
 };
 
-#define to_nn(gem)     container_of(gem, struct ane_nn, base)
-#define to_anec(nn)    (nn->anecp)
-#define to_tnode(tile) (&tile->node)
+#define to_nn(gem)  container_of(gem, struct ane_nn, base)
+#define to_anec(nn) (&nn->anec)
 
-static void ane_iommu_invalidate_tlb(struct ane_device *ane)
+static int ane_mm_free_pages(struct ane_node *node)
 {
-	/* 
-	 * Figured out exactly 12 minutes ago that TLBs for the other two
-	 * "darts" need to be invalidated to *really* flush those old iovas.
-	 * There's an odd relationship here; dart1 & dart2 aren't actual
-	 * darts with dart capabilities to grant a dart device, but they have 
-	 * a register range that closely resembles one, and some of those
-	 * registers need to be synced to the main dart for the DMA channels
-	 * to not panic. Specifically, TTBR and, now I know, TLB streams.
-	 * It's ugly but it works. And I don't think it's worth patching dart.
-	 * 
-	 */
-
-	mutex_lock(&ane->iommu_lock);
-
-	// calls apple_dart_flush_iotlb_all()
-	iommu_flush_iotlb_all(ane->domain);
-
-	/* STREAM_SELECT & STREAM_COMMAND (INVALIDATE=1, BUSY=0) */
-	// writel(0x1, base + 0x34);
-	// writel(0x100000, base + 0x20);
-	writel(0x1, ane->dart1 + ane->hw->dart.sel);
-	writel(ane->hw->dart.invalidate, ane->dart1 + ane->hw->dart.cmd);
-	writel(0x1, ane->dart2 + ane->hw->dart.sel);
-	writel(ane->hw->dart.invalidate, ane->dart2 + ane->hw->dart.cmd);
-
-	/* STREAM_COMMAND = 0x100000 (INVALIDATE=1, BUSY=0) */
-	// writel(0x100000, base + 0x20);
-	writel(ane->hw->dart.invalidate, ane->dart1 + ane->hw->dart.cmd);
-	writel(ane->hw->dart.invalidate, ane->dart2 + ane->hw->dart.cmd);
-
-	writel(0x1, ane->dart1 + ane->hw->dart.sel);
-	writel(ane->hw->dart.invalidate, ane->dart1 + ane->hw->dart.cmd);
-	writel(0x1, ane->dart2 + ane->hw->dart.sel);
-	writel(ane->hw->dart.invalidate, ane->dart2 + ane->hw->dart.cmd);
-
-	writel(ane->hw->dart.invalidate, ane->dart1 + ane->hw->dart.cmd);
-	writel(ane->hw->dart.invalidate, ane->dart2 + ane->hw->dart.cmd);
-
-	mutex_unlock(&ane->iommu_lock);
-}
-
-static void ane_mm_free_pages(struct ane_node *node)
-{
-	for (int i = 0; i < node->npages && node->pages[i] != NULL; i++) {
+	for (u32 i = 0; i < node->npages && node->pages[i] != NULL; i++) {
 		__free_page(node->pages[i]);
 	}
 	kvfree(node->pages);
 	node->pages = NULL;
+	return 0;
 }
 
 static int ane_mm_alloc_pages(struct ane_node *node)
@@ -107,11 +63,10 @@ static int ane_mm_alloc_pages(struct ane_node *node)
 	if (!node->pages)
 		return -ENOMEM;
 
-	for (int i = 0; i < node->npages; i++) {
+	for (u32 i = 0; i < node->npages; i++) {
 		node->pages[i] = alloc_page(GFP_KERNEL);
-		if (node->pages[i] == NULL) {
+		if (node->pages[i] == NULL)
 			goto free_pages;
-		}
 	}
 
 	return 0;
@@ -121,13 +76,11 @@ free_pages:
 	return -ENOMEM;
 }
 
-static int ane_mm_free_user_pages(struct ane_node *node)
+static int ane_mm_put_user_pages(struct ane_node *node)
 {
-	for (int i = 0; i < node->npages; i++) {
-		if (node->pages[i]) {
+	for (u32 i = 0; i < node->npages; i++) {
+		if (node->pages[i])
 			put_page(node->pages[i]);
-			node->pages[i] = NULL;
-		}
 	}
 	kvfree(node->pages);
 	node->pages = NULL;
@@ -139,6 +92,9 @@ static int ane_mm_get_user_pages(struct ane_node *node)
 	long pinned;
 	int err;
 
+	if (!node->userptr)
+		return -EINVAL;
+
 	node->pages =
 		kvmalloc_array(node->npages, sizeof(struct page *), GFP_KERNEL);
 	if (!node->pages)
@@ -148,217 +104,128 @@ static int ane_mm_get_user_pages(struct ane_node *node)
 				node->pages, NULL);
 	if (pinned < 0) {
 		err = pinned;
-		goto free_pages;
+		goto put_pages;
 	}
 
 	pr_info("pinned %lu/%d pages\n", pinned, node->npages);
 
 	if (pinned < node->npages) {
-		err = -ENOMEM;
-		goto free_pages;
+		err = -EINVAL;
+		goto put_pages;
 	}
 
 	return 0;
 
-free_pages:
-	ane_mm_free_user_pages(node);
+put_pages:
+	ane_mm_put_user_pages(node);
 	return err;
 }
 
-static int ane_iommu_map_node(struct ane_device *ane, struct ane_node *node)
+static int ane_iommu_map_pages(struct ane_device *ane, struct ane_node *node)
 {
-	int err = 0;
+	int err;
+
+	if (node->mm)
+		return -EBUSY;
+
+	node->mm = kzalloc(sizeof(*node->mm), GFP_KERNEL);
+	if (!node->mm)
+		return -ENOMEM;
 
 	mutex_lock(&ane->iommu_lock);
 
-	for (int i = 0; i < node->npages; i++) {
-		struct page *p = node->pages[i];
-		dma_addr_t iova = node->iova + (i << ane->shift);
+	/* reserve area from ANE address space */
+	err = drm_mm_insert_node_generic(&ane->mm, node->mm,
+					 node->npages << ane->shift,
+					 1UL << ane->shift, 0, 0);
+	if (err < 0) {
+		dev_err(ane->dev, "out of ANE space: %d\n", err);
+		goto unlock;
+	}
 
-		// calls dart_map_pages()
-		err = iommu_map(ane->domain, iova, page_to_phys(p),
+	node->iova = node->mm->start;
+
+	/* map into ANE address space */
+	for (u32 i = 0; i < node->npages; i++) {
+		dma_addr_t iova = node->iova + (i << ane->shift);
+		err = iommu_map(ane->domain, iova, page_to_phys(node->pages[i]),
 				1UL << ane->shift, IOMMU_READ | IOMMU_WRITE);
-		if (err) {
-			pr_err("iommu_map failed for iova 0x%llx @ 0x%x/0x%x",
-			       iova, i, node->npages);
-			for (int j = 0; j < i; j++) {
+		if (err < 0) {
+			dev_err(ane->dev, "iommu_map failed at 0x%llx", iova);
+			while (i-- > 0) {
 				iommu_unmap(ane->domain,
-					    node->iova + (j << ane->shift),
+					    node->iova + (i << ane->shift),
 					    1UL << ane->shift);
 			}
-			break;
+			goto remove;
 		}
 	}
 
 	mutex_unlock(&ane->iommu_lock);
 
+	return 0;
+
+remove:
+	drm_mm_remove_node(node->mm);
+unlock:
+	mutex_unlock(&ane->iommu_lock);
+	kfree(node->mm);
 	return err;
 }
 
-static int ane_iommu_unmap_node(struct ane_device *ane, struct ane_node *node)
+static int ane_iommu_unmap_pages(struct ane_device *ane, struct ane_node *node)
 {
-	/* each page was mapped individually */
-	/* so the unmap call also has to be looped */
-	mutex_lock(&ane->iommu_lock);
+	if (!node->mm)
+		return 0;
 
-	for (int i = 0; i < node->npages; i++) {
+	mutex_lock(&ane->iommu_lock);
+	for (u32 i = 0; i < node->npages; i++) {
 		dma_addr_t iova = node->iova + (i << ane->shift);
 		iommu_unmap(ane->domain, iova, 1UL << ane->shift);
 	}
-
+	drm_mm_remove_node(node->mm);
 	mutex_unlock(&ane->iommu_lock);
 
-	return 0;
-}
-
-static int ane_mm_resv_iova(struct ane_device *ane, struct ane_node *node)
-{
-	struct iova *alloc =
-		alloc_iova(&ane->iovad, node->npages, ane->limit, true);
-	if (!alloc)
-		return -ENOMEM;
-
-	node->iova = iova_dma_addr(&ane->iovad, alloc);
+	kfree(node->mm);
 
 	return 0;
 }
 
-static void ane_mm_unresv_iova(struct ane_device *ane, struct ane_node *node)
-{
-	free_iova(&ane->iovad, iova_pfn(&ane->iovad, node->iova));
-}
-
-static void ane_nn_unresv_bar(struct ane_device *ane, struct ane_nn *nn)
+static int ane_iommu_invalidate_tlb(struct ane_device *ane)
 {
 	mutex_lock(&ane->iommu_lock);
 
-	for (int i = 0; i < nn->tcount; i++) {
-		int bdx = nn->tmask[i];
-		struct ane_tile *tile = nn->tiles[bdx];
-		struct ane_node *node = &tile->node;
-		if (node->iova) {
-			ane_mm_unresv_iova(ane, node);
-		}
-		nn->req.bar[bdx] = 0;
-		kfree(tile);
-	}
+	iommu_flush_iotlb_all(ane->domain);
+
+	writel(0x1, ane->dart1 + ane->hw->dart.sel);
+	writel(ane->hw->dart.inv, ane->dart1 + ane->hw->dart.cmd);
+	writel(0x1, ane->dart2 + ane->hw->dart.sel);
+	writel(ane->hw->dart.inv, ane->dart2 + ane->hw->dart.cmd);
+
+	writel(ane->hw->dart.inv, ane->dart1 + ane->hw->dart.cmd);
+	writel(ane->hw->dart.inv, ane->dart2 + ane->hw->dart.cmd);
+
+	writel(0x1, ane->dart1 + ane->hw->dart.sel);
+	writel(ane->hw->dart.inv, ane->dart1 + ane->hw->dart.cmd);
+	writel(0x1, ane->dart2 + ane->hw->dart.sel);
+	writel(ane->hw->dart.inv, ane->dart2 + ane->hw->dart.cmd);
+
+	writel(ane->hw->dart.inv, ane->dart1 + ane->hw->dart.cmd);
+	writel(ane->hw->dart.inv, ane->dart2 + ane->hw->dart.cmd);
 
 	mutex_unlock(&ane->iommu_lock);
+
+	return 0;
 }
 
-static int ane_nn_resv_bar(struct ane_device *ane, struct ane_nn *nn)
+static int ane_nn_validate_anec(struct ane_device *ane, struct ane_nn *nn)
 {
 	struct anec *anec = to_anec(nn);
-	int err;
+	int i = 0;
 
-	/* 
-	 * BAR is a 0x20 hardware queue of iovas for DMA chans.
-	 * It's "base" in the sense of "starting iova" for the 
-	 * rasterizer unit broadcasting tiled segment workloads,
-	 * not "physical base" as in translation tables.
-	 * 
-	 * [0] - register state descriptor
-	 * [1] - weights data
-	 * [2] - intermediate tile 2, if it exists
-	 * [3] - intermediate tile 1, if it exists
-	 * [4] - output tile 1
-	 * [N] - input tile 1
-	 * 
-	 * where output tile iovas occupy from 4 to (N - 1) and
-	 * input tile iovas occupy from N to (N + input_count).
+	/*
+	 * Checks in case the compiler output was messed with...
 	 */
-
-	mutex_lock(&ane->iommu_lock);
-
-	for (int i = 0; i < nn->tcount; i++) {
-		int bdx = nn->tmask[i];
-		struct ane_node *node = NULL;
-		struct ane_tile *tile =
-			kzalloc(sizeof(struct ane_tile), GFP_KERNEL);
-		if (!tile) {
-			err = -ENOMEM;
-			goto unresv_bar;
-		}
-		node = &tile->node;
-		nn->tiles[bdx] = tile;
-
-		tile->type = anec->types[bdx];
-		node->npages = anec->tiles[bdx];
-
-		err = ane_mm_resv_iova(ane, node);
-		if (err < 0) {
-			pr_err("failed to reserve iova\n");
-			goto unresv_bar;
-		}
-		nn->req.bar[bdx] = node->iova;
-	}
-
-	mutex_unlock(&ane->iommu_lock);
-
-	/* 
-	 * The command buffer is the register state descriptor catted with
-	 * the weights data (kernel) @ 16 gran padding. Both are "immutable",
-	 * meaning its dedicated DMA channel is a one-way, read-only one.
-	 * 
-	 * Before inputs are even thought of, kernel coefficients are
-	 * prefetched and loaded onto the engine cores as instructed by the
-	 * control registers, which are DMA'd to from the register state
-	 * descriptor as step 0.
-	 * 
-	 * I'm pretty sure it's packed this way for efficient bank aligned
-	 * access, but it's also a convienient serialization method, making one
-	 * less non-aligned buffer to worry about. We thus unpack the iova at
-	 * which the kernel _should_ start; if it doesn't the req will fail
-	 * and we have the queue resetter for that :).
-	 */
-
-	nn->req.bar[1] = nn->req.bar[0] + roundup(anec->tsk_size, CMD_GRAN);
-
-	return 0;
-
-unresv_bar:
-	mutex_unlock(&ane->iommu_lock);
-	ane_nn_unresv_bar(ane, nn);
-	return err;
-}
-
-static int ane_nn_resv_fifo(struct ane_device *ane, struct ane_nn *nn)
-{
-	int err;
-	struct ane_node *node = kzalloc(sizeof(struct ane_node), GFP_KERNEL);
-	if (!node)
-		return -ENOMEM;
-	nn->fifo_node = node;
-
-	node->npages = 1;
-	err = ane_mm_resv_iova(ane, node);
-	if (err < 0) {
-		pr_err("failed to reserve iova\n");
-		goto free_kmem;
-	}
-
-	nn->req.nid = FIFO_NID_MAGIC;
-	nn->req.fifo_addr = node->iova;
-
-	return 0;
-
-free_kmem:
-	kfree(node);
-	return 0;
-}
-
-static void ane_nn_unresv_fifo(struct ane_device *ane, struct ane_nn *nn)
-{
-	struct ane_node *node = nn->fifo_node;
-	ane_mm_unresv_iova(ane, node);
-	kfree(node);
-}
-
-static int ane_nn_validate_args(struct ane_device *ane, struct ane_nn *nn)
-{
-	struct anec *anec = to_anec(nn);
-	int tcount = 0;
-
 	if (!anec->size || !anec->tsk_size || !anec->krn_size ||
 	    !anec->td_size || !anec->td_count)
 		return -EINVAL;
@@ -366,60 +233,46 @@ static int ane_nn_validate_args(struct ane_device *ane, struct ane_nn *nn)
 	if (anec->tsk_size < anec->td_size)
 		return -EINVAL;
 
+	if ((anec->td_size * 2) > 1UL << ane->shift)
+		return -EINVAL;
+
 	if (anec->size !=
-	    (roundup(anec->tsk_size, CMD_GRAN) + anec->krn_size)) {
-		pr_err("invalid cmd buf size\n");
+	    (roundup(anec->tsk_size, ANE_CMD_GRAN) + anec->krn_size))
 		return -EINVAL;
-	}
 
-	if (anec->td_count >= 0xffff) {
-		pr_err("td_count exceeds limit\n");
+	if (anec->td_count >= 0xffff)
 		return -EINVAL;
-	}
 
-	if (!anec->tiles[0] || anec->types[0] != TILE_CMD || anec->tiles[1]) {
-		pr_err("invalid cmd stack\n");
+	if (!anec->tiles[0] || anec->types[0] != ANE_TILE_CMD || anec->tiles[1])
 		return -EINVAL;
-	}
 
-	if (anec->tiles[2] && !anec->tiles[3]) {
-		pr_err("invalid itm stack\n");
+	if (anec->tiles[2] && !anec->tiles[3])
 		return -EINVAL;
-	}
 
-	if (!anec->tiles[4] || !anec->tiles[5]) {
-		pr_err("need at least 1 src & dst\n");
+	if (!anec->tiles[4] || !anec->tiles[5])
 		return -EINVAL;
-	}
 
-	// clang-format off
-	for (int i = 0; i < MAX_TILE_COUNT; i++) {
-		if (anec->tiles[i]) {
-			nn->tmask[tcount] = i;
-			tcount++;
-		}
-		if (anec->tiles[i] > 0xffff) {
-			pr_err("tile size exceeds limit\n");
+	for (int bdx = 0; bdx < ANE_TILE_COUNT; bdx++) {
+		if (anec->tiles[bdx])
+			nn->tile_bdx[i++] = bdx;
+
+		if (anec->tiles[bdx] && !anec->types[bdx])
 			return -EINVAL;
-		}
-		if (anec->tiles[i] && !anec->types[i]) {
-			return -EINVAL;
-		}
-		if (!anec->tiles[i] && anec->types[i]) {
-			return -EINVAL;
-		}
-		if (anec->tiles[i] && 
-		    anec->types[i] != TILE_CMD &&
-		    anec->types[i] != TILE_ITM && 
-		    anec->types[i] != TILE_SRC &&
-		    anec->types[i] != TILE_DST) {
-			pr_err("invalid tile type\n");
-			return -EINVAL;
-		}
-	}
-	// clang-format on
 
-	nn->tcount = tcount;
+		if (!anec->tiles[bdx] && anec->types[bdx])
+			return -EINVAL;
+
+		if (anec->tiles[bdx] > 0xffff)
+			return -EINVAL;
+
+		if (anec->tiles[bdx] && anec->types[bdx] != ANE_TILE_CMD &&
+		    anec->types[bdx] != ANE_TILE_ITM &&
+		    anec->types[bdx] != ANE_TILE_DST &&
+		    anec->types[bdx] != ANE_TILE_SRC)
+			return -EINVAL;
+	}
+
+	nn->tile_count = i;
 
 	return 0;
 }
@@ -433,11 +286,11 @@ static const struct drm_gem_object_funcs ane_gem_object_funcs = {
 	.vm_ops = &drm_gem_ane_vm_ops,
 };
 
-static int ane_nn_init(struct drm_device *drm, void *data,
-		       struct drm_file *file)
+static int ane_nn_create(struct drm_device *drm, void *data,
+			 struct drm_file *file)
 {
 	struct ane_device *ane = drm->dev_private;
-	struct drm_ane_nn_init *args = data;
+	struct drm_ane_nn_create *args = data;
 	struct drm_gem_object *gem = NULL;
 	struct ane_nn *nn = NULL;
 	struct anec *anec = NULL;
@@ -448,225 +301,216 @@ static int ane_nn_init(struct drm_device *drm, void *data,
 
 	if (!(nn = kzalloc(sizeof(struct ane_nn), GFP_KERNEL)))
 		return -ENOMEM;
-	if (!(anec = kzalloc(sizeof(struct ane_nn), GFP_KERNEL))) {
-		kfree(nn);
-		return -ENOMEM;
-	}
 
+	anec = to_anec(nn);
 	err = copy_from_user(anec, u64_to_user_ptr(args->anec_userptr),
 			     sizeof(struct anec));
 	if (err) {
-		pr_err("failed to copy 0x%x bytes from user\n", err);
-		err = -ENOMEM;
-		goto free_kmem;
+		dev_err(ane->dev, "failed to copy anec\n");
+		err = -EFAULT;
+		goto free_nn;
 	}
-	nn->anecp = anec;
 
-	err = ane_nn_validate_args(ane, nn);
-	if (err) {
-		pr_err("invalid anec setup\n");
-		goto free_kmem;
+	err = ane_nn_validate_anec(ane, nn);
+	if (err < 0) {
+		dev_err(ane->dev, "invalid anec setup\n");
+		goto free_nn;
 	}
 
 	nn->mapped = 0;
+	nn->req.nid = ANE_FIFO_NID;
 	nn->req.td_size = anec->td_size;
 	nn->req.td_count = anec->td_count;
-	pr_info("received nn req with size: 0x%llx td_count: 0x%x\n",
-		anec->size, nn->req.td_count);
+
+	pr_info("received nn with size: 0x%llx td_count: 0x%x\n", anec->size,
+		nn->req.td_count);
 
 	/* fake mini gem backing for the sake of a handle */
 	gem = &nn->base;
 	gem->funcs = &ane_gem_object_funcs;
 	err = drm_gem_object_init(drm, gem, PAGE_SIZE);
 	if (err < 0)
-		goto free_kmem;
+		goto free_nn;
 
 	err = drm_gem_handle_create(file, gem, &args->handle);
-	drm_gem_object_put(gem); // handle holds it now
+	drm_gem_object_put(gem); /* handle holds it now */
 	if (err < 0)
-		goto object_rel;
-
-	err = ane_nn_resv_bar(ane, nn);
-	if (err < 0) {
-		pr_err("failed to resv bar\n");
-		goto handle_del;
-	}
-
-	err = ane_nn_resv_fifo(ane, nn);
-	if (err < 0) {
-		pr_err("failed to resv fifo\n");
-		goto unresv_bar;
-	}
+		goto release;
 
 	return 0;
 
-unresv_bar:
-	ane_nn_unresv_bar(ane, nn);
-handle_del:
-	drm_gem_handle_delete(file, args->handle);
-object_rel:
+release:
 	drm_gem_object_release(gem);
-free_kmem:
-	kfree(anec);
+free_nn:
 	kfree(nn);
 	return err;
 }
 
-static int ane_nn_deinit(struct drm_device *drm, void *data,
-			 struct drm_file *file)
+static struct ane_nn *ane_nn_lookup(struct drm_file *file, u32 handle)
 {
-	struct ane_device *ane = drm->dev_private;
-	struct drm_ane_nn_deinit *args = data;
+	struct drm_gem_object *gem;
 
-	struct drm_gem_object *gem = drm_gem_object_lookup(file, args->handle);
-	struct ane_nn *nn;
-	if (args->pad || gem == NULL)
+	gem = drm_gem_object_lookup(file, handle);
+	if (!gem)
+		return NULL;
+
+	return to_nn(gem);
+}
+
+static int ane_nn_free(struct drm_device *drm, void *data,
+		       struct drm_file *file)
+{
+	struct drm_ane_nn_free *args = data;
+
+	struct ane_nn *nn = ane_nn_lookup(file, args->handle);
+	if (args->pad || !nn)
 		return -EINVAL;
 
-	nn = to_nn(gem);
-
-	ane_nn_unresv_fifo(ane, nn);
-	ane_nn_unresv_bar(ane, nn);
+	WARN_ON(nn->mapped);
+	pr_info("freeing nn with size: 0x%llx td_count: 0x%x\n",
+		to_anec(nn)->size, nn->req.td_count);
 
 	drm_gem_handle_delete(file, args->handle);
-	drm_gem_object_release(gem);
+	drm_gem_object_release(&nn->base);
 
-	kfree(nn->anecp);
 	kfree(nn);
 	return 0;
 }
 
-static int __ane_nn_unsync(struct ane_device *ane, struct ane_nn *nn)
+static void __ane_nn_unmap(struct ane_device *ane, struct ane_nn *nn)
 {
 	WARN_ON(!nn->mapped);
 
-	for (int i = 0; i < nn->tcount; i++) {
-		int bdx = nn->tmask[i];
-		struct ane_tile *tile = nn->tiles[bdx];
-		struct ane_node *node = to_tnode(tile);
+	for (int i = 0; i < nn->tile_count; i++) {
+		int bdx = nn->tile_bdx[i];
+		struct ane_node *tile = &nn->tiles[bdx];
 
-		if (tile->type == TILE_ITM) {
-			ane_mm_free_pages(node);
-		} else {
-			ane_mm_free_user_pages(node);
+		if (nn->req.bar[bdx]) {
+			ane_iommu_unmap_pages(ane, tile);
+			nn->req.bar[bdx] = 0;
 		}
 
-		ane_iommu_unmap_node(ane, node);
+		if (tile->pages) {
+			if (tile->type == ANE_TILE_ITM) {
+				ane_mm_free_pages(tile);
+			} else {
+				ane_mm_put_user_pages(tile);
+			}
+		}
 	}
 
-	ane_mm_free_user_pages(nn->fifo_node);
-	ane_iommu_unmap_node(ane, nn->fifo_node);
+	if (nn->req.fifo_addr) {
+		ane_iommu_unmap_pages(ane, &nn->fifo);
+		nn->req.fifo_addr = 0;
+	}
+	if (nn->fifo.pages)
+		ane_mm_put_user_pages(&nn->fifo);
 
+	/* macos invalidates on a per-network basis */
 	ane_iommu_invalidate_tlb(ane);
 
 	nn->mapped = 0;
+}
 
+static int ane_nn_unmap(struct drm_device *drm, void *data,
+			struct drm_file *file)
+{
+	struct ane_device *ane = drm->dev_private;
+	struct drm_ane_nn_unmap *args = data;
+	struct ane_nn *nn = ane_nn_lookup(file, args->handle);
+	if (args->pad || !nn)
+		return -EINVAL;
+	__ane_nn_unmap(ane, nn);
 	return 0;
 }
 
-static int ane_nn_unsync(struct drm_device *drm, void *data,
-			 struct drm_file *file)
+static int ane_nn_map(struct drm_device *drm, void *data, struct drm_file *file)
 {
 	struct ane_device *ane = drm->dev_private;
-	struct drm_ane_nn_unsync *args = data;
-	struct drm_gem_object *gem = drm_gem_object_lookup(file, args->handle);
-	if (args->pad || gem == NULL)
-		return -EINVAL;
-	__ane_nn_unsync(ane, to_nn(gem));
-	return 0;
-}
+	struct drm_ane_nn_map *args = data;
+	int err;
 
-static int ane_nn_sync(struct drm_device *drm, void *data,
-		       struct drm_file *file)
-{
-	/* 
-	 * Pages need to be mapped to IOMMU space the DMA channels operate on;
-	 * these chans expect a continuous _iova_ block. Physically continuous
-	 * mem is out of the question given the size of these neural nets.
-	 * As the DMA API doesn't let this happen over non-continuous mem,
-	 * each page must be iommu_map()'d on its reserved iova offset.
-	 * 
-	 * Current impl uses user pages pinned by get_user_pages() as 
-	 * backings for the continuous iova block to be DMA'd. By this iommu
-	 * glue, these mappings become both user and device continuous,
-	 * saving a lot of overhead. Corrections were made s.t. the kernel
-	 * never accesses these pages.
-	 * 
-	 * This isn't DRM typical, but Intel's latest VPU patch also has 
-	 * pin_user_pages(), and I couldn't think of a better way to do this.
-	 * 
-	 */
-
-	struct ane_device *ane = drm->dev_private;
-	struct drm_ane_nn_sync *args = data;
-	int err = 0;
-
-	struct drm_gem_object *gem = drm_gem_object_lookup(file, args->handle);
-	struct ane_nn *nn;
-	struct anec *anec;
-	if (gem == NULL || args->pad)
+	struct anec *anec = NULL;
+	struct ane_nn *nn = ane_nn_lookup(file, args->handle);
+	if (args->pad || !nn)
 		return -EINVAL;
 
-	nn = to_nn(gem);
-	anec = to_anec(nn);
 	if (nn->mapped)
-		return -EINVAL;
+		return 0;
 
-	for (int i = 0; i < nn->tcount; i++) {
-		int bdx = nn->tmask[i];
-		struct ane_tile *tile = nn->tiles[bdx];
-		struct ane_node *node = to_tnode(tile);
+	anec = to_anec(nn);
 
-		/* 
-		 * Intermediate buffers are just swap space the engine demands
-		 * when operation exceeds L2. Users don't need them whatsoever.
+	for (int i = 0; i < nn->tile_count; i++) {
+		int bdx = nn->tile_bdx[i];
+		struct ane_node *tile = &nn->tiles[bdx];
+
+		tile->npages = anec->tiles[bdx];
+		tile->type = anec->types[bdx];
+		tile->userptr = args->tile_userptr[bdx];
+
+		/*
+		 * Intermediate buffers are just swap space the engine
+		 * demands when an operation exceeds L2. They're not BERT
+		 * intermediate layers, users don't need them whatsoever.
 		 * Back with alloc_page() & keep it in here.
-		 * 
 		 */
-
-		node->userptr = args->tile_userptr[bdx];
-		if (tile->type == TILE_ITM) {
-			if (node->userptr) {
-				err = -EINVAL;
-				goto error;
-			}
-			err = ane_mm_alloc_pages(node);
+		if (tile->type == ANE_TILE_ITM) {
+			err = ane_mm_alloc_pages(tile);
 		} else {
-			if (!node->userptr) {
-				err = -EINVAL;
-				goto error;
-			}
-			err = ane_mm_get_user_pages(node);
+			err = ane_mm_get_user_pages(tile);
 		}
 
-		if (err) {
-			pr_err("failed to allocate backing pages\n");
+		if (err < 0) {
+			dev_err(ane->dev, "failed to obtain backing pages\n");
 			goto error;
 		}
 
-		err = ane_iommu_map_node(ane, node);
-		if (err) {
-			pr_err("failed to map pages to device space\n");
+		err = ane_iommu_map_pages(ane, tile);
+		if (err < 0) {
+			dev_err(ane->dev, "failed to map pages to device\n");
 			goto error;
 		}
+
+		nn->req.bar[bdx] = lower_32_bits(tile->iova);
 	}
 
-	nn->fifo_node->userptr = args->fifo_userptr;
-	err = ane_mm_get_user_pages(nn->fifo_node);
-	if (err) {
-		pr_err("failed to allocate backing pages\n");
+	/*
+	 * Naturally, Apple stores the compiled neural network as the
+	 * TD catted with the kernel @ 16 gran padding. This not only
+	 * takes advantage of bank aligned access, but it's also a
+	 * convienient serialization method, making one less non-aligned
+	 * buffer to worry about. We thus unpack the iova at which the
+	 * kernel *should* start.
+	 */
+	nn->req.bar[1] = nn->req.bar[0] + roundup(anec->tsk_size, ANE_CMD_GRAN);
+
+	/*
+	 * Technically the firmware maintains a pool of fifo buffers
+	 * with each entry masked to jump to the next. However the
+	 * actual pool is just a firmware-level construct, and only two
+	 * valid entries, with the first instructed to jump to the second,
+	 * is needed to execute the (first) network. We could make this
+	 * mini per-network pool here but we can also get it from userspace.
+	 */
+	nn->fifo.npages = 1;
+	nn->fifo.userptr = args->fifo_userptr;
+	err = ane_mm_get_user_pages(&nn->fifo);
+	if (err < 0) {
+		dev_err(ane->dev, "failed to obtain backing pages\n");
 		goto error;
 	}
 
-	err = ane_iommu_map_node(ane, nn->fifo_node);
-	if (err) {
-		pr_err("failed to map pages to device space\n");
+	err = ane_iommu_map_pages(ane, &nn->fifo);
+	if (err < 0) {
+		dev_err(ane->dev, "failed to map pages to device\n");
 		goto error;
 	}
 
-	for (int i = 0; i < MAX_TILE_COUNT; i++) {
+	nn->req.fifo_addr = lower_32_bits(nn->fifo.iova);
+
+	for (int i = 0; i < ANE_TILE_COUNT; i++) {
 		if (nn->req.bar[i]) {
-			pr_info("BAR %d: 0x%llx\n", i, nn->req.bar[i]);
+			pr_info("BAR %d: 0x%08x\n", i, nn->req.bar[i]);
 		}
 	}
 
@@ -675,7 +519,7 @@ static int ane_nn_sync(struct drm_device *drm, void *data,
 	return 0;
 
 error:
-	__ane_nn_unsync(ane, nn);
+	__ane_nn_unmap(ane, nn);
 	return err;
 }
 
@@ -684,50 +528,39 @@ static int ane_nn_exec(struct drm_device *drm, void *data,
 {
 	struct ane_device *ane = drm->dev_private;
 	struct drm_ane_nn_exec *args = data;
-	struct drm_gem_object *gem = drm_gem_object_lookup(file, args->handle);
-	struct ane_nn *nn;
 	int err;
-	if (gem == NULL || args->pad)
+
+	struct ane_nn *nn = ane_nn_lookup(file, args->handle);
+	if (args->pad || !nn)
 		return -EINVAL;
 
-	nn = to_nn(gem);
-	if (!nn->mapped) {
-		pr_err("not mapped to device space\n");
+	if (!nn->mapped)
 		return -EINVAL;
-	}
-
-	/* 
-	 * Queues are bottlenecked by the fact that the cores (in parallel)
-	 * can only process one request at a time. I'm not sure if it's 
-	 * worth implementing scheduling logic for essentially <40 w32's.
-	 * I have yet to see Apple use any of the other queues either.
-	 * 
-	 */
 
 	mutex_lock(&ane->engine_lock);
 
 	err = ane_tm_enqueue(ane, &nn->req);
 	if (err < 0)
-		goto exit;
+		goto error;
 
 	err = ane_tm_execute(ane, &nn->req);
 	if (err < 0)
-		goto exit;
+		goto error;
 
 	mutex_unlock(&ane->engine_lock);
 
 	return 0;
 
-exit:
+error:
 	mutex_unlock(&ane->engine_lock);
 	return err;
 }
 
-static const struct drm_ioctl_desc ane_drm_driver_ioctls[] = {
-	DRM_IOCTL_DEF_DRV(ANE_NN_INIT, ane_nn_init, DRM_RENDER_ALLOW),
-	DRM_IOCTL_DEF_DRV(ANE_NN_DEINIT, ane_nn_deinit, DRM_RENDER_ALLOW),
-	DRM_IOCTL_DEF_DRV(ANE_NN_SYNC, ane_nn_sync, DRM_RENDER_ALLOW),
-	DRM_IOCTL_DEF_DRV(ANE_NN_UNSYNC, ane_nn_unsync, DRM_RENDER_ALLOW),
+static const struct drm_ioctl_desc ane_drm_ioctls[] = {
+	DRM_IOCTL_DEF_DRV(ANE_NN_CREATE, ane_nn_create, DRM_RENDER_ALLOW),
+	DRM_IOCTL_DEF_DRV(ANE_NN_FREE, ane_nn_free, DRM_RENDER_ALLOW),
+	DRM_IOCTL_DEF_DRV(ANE_NN_MAP, ane_nn_map, DRM_RENDER_ALLOW),
+	DRM_IOCTL_DEF_DRV(ANE_NN_UNMAP, ane_nn_unmap, DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(ANE_NN_EXEC, ane_nn_exec, DRM_RENDER_ALLOW),
 };
 
@@ -758,7 +591,8 @@ static void ane_drm_postclose(struct drm_device *drm, struct drm_file *file)
 	pm_runtime_put_autosuspend(ane->dev);
 }
 
-long ane_drm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+static long ane_drm_unlocked_ioctl(struct file *file, unsigned int cmd,
+				   unsigned long arg)
 {
 	struct drm_file *filp = file->private_data;
 	struct drm_device *drm = filp->minor->dev;
@@ -779,11 +613,11 @@ long ane_drm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	return err;
 }
 
-static const struct file_operations ane_drm_driver_fops = {
+static const struct file_operations ane_drm_fops = {
 	.owner = THIS_MODULE,
-	.open = drm_open,
+	.open = drm_open, // accel_open
 	.release = drm_release,
-	.unlocked_ioctl = ane_drm_ioctl,
+	.unlocked_ioctl = ane_drm_unlocked_ioctl,
 	.mmap = drm_gem_mmap,
 	.poll = drm_poll,
 	.read = drm_read,
@@ -791,20 +625,20 @@ static const struct file_operations ane_drm_driver_fops = {
 };
 
 static const struct drm_driver ane_drm_driver = {
-	.driver_features = DRIVER_GEM | DRIVER_RENDER,
+	.driver_features = DRIVER_GEM | DRIVER_RENDER, // DRIVER_COMPUTE_ACCEL
 	.open = ane_drm_open,
 	.postclose = ane_drm_postclose,
-	.ioctls = ane_drm_driver_ioctls,
-	.num_ioctls = ARRAY_SIZE(ane_drm_driver_ioctls),
-	.fops = &ane_drm_driver_fops,
+	.ioctls = ane_drm_ioctls,
+	.num_ioctls = ARRAY_SIZE(ane_drm_ioctls),
+	.fops = &ane_drm_fops,
 	.name = "ane",
 	.desc = "Apple Neural Engine driver",
 	.date = "20230103",
-	.major = 123,
+	.major = 1,
 	.minor = 0,
 };
 
-static int ane_iommu_sync_ttbr(struct ane_device *ane)
+static int ane_iommu_remap_ttbr(struct ane_device *ane)
 {
 	int err = 0;
 	u32 ttbr;
@@ -812,35 +646,27 @@ static int ane_iommu_sync_ttbr(struct ane_device *ane)
 	void __iomem *ttbr_reg =
 		ioremap(ane->hw->dart.base + ane->hw->dart.ttbr, sizeof(u32));
 	if (IS_ERR(ttbr_reg))
-		return -ENXIO;
+		return PTR_ERR(ttbr_reg);
 
 	ttbr = readl_relaxed(ttbr_reg);
-	if (ttbr == 0) {
-		pr_err("base dart not initialized\n");
-		err = -ENXIO;
-		goto unmap_reg;
+	if (!ttbr) {
+		dev_err(ane->dev, "base dart not initialized\n");
+		err = -EPROBE_DEFER;
+		goto unmap;
 	}
 
 	/* remap ttbr so DMA chans can do their thing */
 	writel_relaxed(ttbr, ane->dart1 + ane->hw->dart.ttbr);
 	writel_relaxed(ttbr, ane->dart2 + ane->hw->dart.ttbr);
 
-	if (readl_relaxed(ttbr_reg) !=
-		    readl_relaxed(ane->dart1 + ane->hw->dart.ttbr) ||
-	    readl_relaxed(ttbr_reg) !=
-		    readl_relaxed(ane->dart2 + ane->hw->dart.ttbr)) {
-		pr_err("failed to remap ttbr to dma channels\n");
-		err = -ENXIO;
-	}
-
-unmap_reg:
+unmap:
 	iounmap(ttbr_reg);
 	return err;
 }
 
 static void ane_iommu_domain_free(struct ane_device *ane)
 {
-	put_iova_domain(&ane->iovad);
+	drm_mm_takedown(&ane->mm);
 }
 
 static int ane_iommu_domain_init(struct ane_device *ane)
@@ -851,36 +677,31 @@ static int ane_iommu_domain_init(struct ane_device *ane)
 
 	struct iommu_domain *domain = iommu_get_domain_for_dev(ane->dev);
 	if (!domain)
-		return -ENODEV;
+		return -EPROBE_DEFER;
+
 	ane->domain = domain;
 
+	/* ANE objects must be 16K */
 	order = __ffs(ane->domain->pgsize_bitmap);
 	iommu_page_size = 1UL << order; // 16K
 	if (iommu_page_size != ane->hw->dart.page_size) {
-		pr_err("iommu page size doesn't match dart config\n");
-		return -ENXIO;
+		dev_err(ane->dev, "invalid iommu page size\n");
+		return -EINVAL;
 	}
+	ane->shift = order;
+
+	err = ane_iommu_remap_ttbr(ane);
+	if (err < 0)
+		return err;
 
 	/* DMA chans can't access iovas past the limit */
 	/* likely a kernel prefetch distance constraint */
 	min_iova = ane->hw->dart.vm_base;
-	init_iova_domain(&ane->iovad, iommu_page_size, min_iova >> order);
-	ane->shift = iova_shift(&ane->iovad);
-
-	max_iova = min_iova + ane->hw->dart.vm_size - iommu_page_size;
-	if (!ane->hw->dart.vm_size)
-		max_iova = ane->domain->geometry.aperture_end;
 
 	/* a page before as to not reach real limit */
-	max_iova -= iommu_page_size;
-	ane->limit = max_iova >> iova_shift(&ane->iovad);
+	max_iova = min_iova + ane->hw->dart.vm_size - iommu_page_size;
 
-	err = ane_iommu_sync_ttbr(ane);
-	if (err < 0) {
-		pr_err("failed to sync ttbr\n");
-		ane_iommu_domain_free(ane);
-		return err;
-	}
+	drm_mm_init(&ane->mm, min_iova, max_iova);
 
 	return 0;
 }
@@ -939,7 +760,7 @@ static int ane_attach_genpd(struct ane_device *ane)
 	return 0;
 }
 
-static int ane_pdev_probe(struct platform_device *pdev)
+static int ane_platform_probe(struct platform_device *pdev)
 {
 	struct ane_device *ane;
 	struct drm_device *drm;
@@ -994,28 +815,16 @@ static int ane_pdev_probe(struct platform_device *pdev)
 		goto detach_genpd;
 	}
 
-	ane->perf = devm_platform_ioremap_resource_byname(pdev, "perf");
-	if (IS_ERR(ane->perf)) {
-		err = PTR_ERR(ane->perf);
-		goto detach_genpd;
-	}
-
 	mutex_init(&ane->iommu_lock);
 	mutex_init(&ane->engine_lock);
 
 	err = ane_iommu_domain_init(ane);
-	if (err < 0) {
-		dev_err(ane->dev, "failed to attatch iommu domain\n");
+	if (err < 0)
 		goto detach_genpd;
-	}
 
 	ane_tm_enable(ane);
 
-	err = drm_dev_register(drm, 0);
-	if (err < 0)
-		goto iommu_free;
-
-	// measured 3sec on macos
+	/* measured 3sec on macos */
 	pm_runtime_set_autosuspend_delay(ane->dev, 3000);
 	pm_runtime_use_autosuspend(ane->dev);
 
@@ -1026,27 +835,66 @@ static int ane_pdev_probe(struct platform_device *pdev)
 	pm_runtime_mark_last_busy(ane->dev);
 	pm_runtime_put_autosuspend(ane->dev);
 
+	err = drm_dev_register(drm, 0);
+	if (err < 0)
+		goto disable_pm;
+
 	pr_info("loaded ane!\n");
 
 	return 0;
 
-iommu_free:
+disable_pm:
+	pm_runtime_disable(ane->dev);
+	pm_runtime_dont_use_autosuspend(ane->dev);
 	ane_iommu_domain_free(ane);
 detach_genpd:
 	ane_detach_genpd(ane);
 	return err;
 }
 
-static int ane_pdev_remove(struct platform_device *pdev)
+static int ane_platform_remove(struct platform_device *pdev)
 {
 	struct ane_device *ane = platform_get_drvdata(pdev);
-	pm_runtime_disable(&pdev->dev);
-	pm_runtime_dont_use_autosuspend(&pdev->dev);
 	drm_dev_unregister(&ane->drm);
+	pm_runtime_disable(ane->dev);
+	pm_runtime_dont_use_autosuspend(ane->dev);
 	ane_iommu_domain_free(ane);
 	ane_detach_genpd(ane);
 	return 0;
 }
+
+static int __maybe_unused ane_runtime_suspend(struct device *dev)
+{
+	struct ane_device *ane = dev_get_drvdata(dev);
+	ane_iommu_invalidate_tlb(ane);
+	return 0;
+}
+
+static int __maybe_unused ane_runtime_resume(struct device *dev)
+{
+	struct ane_device *ane = dev_get_drvdata(dev);
+	ane_tm_enable(ane);
+	return 0;
+}
+
+static int __maybe_unused ane_pm_suspend(struct device *dev)
+{
+	struct ane_device *ane = dev_get_drvdata(dev);
+	return pm_runtime_force_suspend(ane->dev);
+}
+
+static int __maybe_unused ane_pm_resume(struct device *dev)
+{
+	struct ane_device *ane = dev_get_drvdata(dev);
+	return pm_runtime_force_resume(ane->dev);
+}
+
+// clang-format off
+static const struct dev_pm_ops ane_pm_ops = {
+	SET_RUNTIME_PM_OPS(ane_runtime_suspend, ane_runtime_resume, NULL)
+	SET_SYSTEM_SLEEP_PM_OPS(ane_pm_suspend, ane_pm_resume)
+};
+// clang-format on
 
 /* T8020/T6000 registers */
 #define DART_T8020_STREAM_COMMAND	     0x20
@@ -1066,13 +914,13 @@ static const struct ane_hw ane_hw_t8103 = {
 		.dart1 = 0x26b810000,
 		.dart2 = 0x26b820000,
 		.dapf = 0x26b804000,
-		.vm_base = 0x0,
+		.vm_base = 0x4000,
 		.vm_size = 0xe0000000,
 		.page_size = 0x4000,
 		.ttbr = DART_T8020_TTBR,
 		.sel = DART_T8020_STREAM_SELECT,
 		.cmd = DART_T8020_STREAM_COMMAND,
-		.invalidate = DART_T8020_STREAM_COMMAND_INVALIDATE,
+		.inv = DART_T8020_STREAM_COMMAND_INVALIDATE,
 	},
 };
 
@@ -1088,13 +936,13 @@ static const struct ane_hw ane_hw_t6000_ane0 = {
 		.dart1 = 0x285810000,
 		.dart2 = 0x285820000,
 		.dapf = 0x285804000,
-		.vm_base = 0x0,
+		.vm_base = 0x4000,
 		.vm_size = 0xe0000000,
 		.page_size = 0x4000,
 		.ttbr = DART_T8020_TTBR,
 		.sel = DART_T8020_STREAM_SELECT,
 		.cmd = DART_T8020_STREAM_COMMAND,
-		.invalidate = DART_T8020_STREAM_COMMAND_INVALIDATE,
+		.inv = DART_T8020_STREAM_COMMAND_INVALIDATE,
 	},
 };
 
@@ -1110,55 +958,35 @@ static const struct ane_hw ane_hw_t6000_ane2 = {
 		.dart1 = 0x2285810000,
 		.dart2 = 0x2285820000,
 		.dapf = 0x2285804000,
-		.vm_base = 0x0,
+		.vm_base = 0x4000,
 		.vm_size = 0xe0000000,
 		.page_size = 0x4000,
 		.ttbr = DART_T8020_TTBR,
 		.sel = DART_T8020_STREAM_SELECT,
 		.cmd = DART_T8020_STREAM_COMMAND,
-		.invalidate = DART_T8020_STREAM_COMMAND_INVALIDATE,
+		.inv = DART_T8020_STREAM_COMMAND_INVALIDATE,
 	},
 };
 
-static const struct of_device_id ane_pdev_match[] = {
+static const struct of_device_id ane_of_match[] = {
 	{ .compatible = "apple,t8103-ane", .data = &ane_hw_t8103 },
 	{}
 };
-MODULE_DEVICE_TABLE(of, ane_pdev_match);
 
-static int __maybe_unused ane_runtime_resume(struct device *dev)
-{
-	struct ane_device *ane = dev_get_drvdata(dev);
-	ane_tm_enable(ane);
-	return 0;
-}
+MODULE_DEVICE_TABLE(of, ane_of_match);
 
-static int __maybe_unused ane_runtime_suspend(struct device *dev)
-{
-	struct ane_device *ane = dev_get_drvdata(dev);
-	ane_iommu_invalidate_tlb(ane);
-	return 0;
-}
-
-// clang-format off
-static const struct dev_pm_ops ane_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend, pm_runtime_force_resume)
-	SET_RUNTIME_PM_OPS(ane_runtime_suspend, ane_runtime_resume, NULL)
-};
-// clang-format on
-
-static struct platform_driver ane_pdev_driver = {
-    .probe  = ane_pdev_probe,
-    .remove = ane_pdev_remove,
+static struct platform_driver ane_platform_driver = {
+    .probe  = ane_platform_probe,
+    .remove = ane_platform_remove,
     .driver =
 	{
 	    .name	    = "ane",
-	    .owner	    = THIS_MODULE,
 	    .pm             = pm_ptr(&ane_pm_ops),
-	    .of_match_table = ane_pdev_match,
+	    .of_match_table = ane_of_match,
 	},
 };
-module_platform_driver(ane_pdev_driver);
+
+module_platform_driver(ane_platform_driver);
 
 MODULE_AUTHOR("Eileen Yoon <eyn@gmx.com>");
 MODULE_DESCRIPTION("Apple Neural Engine driver");

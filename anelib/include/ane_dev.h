@@ -10,10 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "ane_model.h"
 #include "drm_ane.h"
-
-#define ANE_SYSFS_PATH "/dev/dri/renderD129"
 
 struct ane_device {
 	int fd;
@@ -22,19 +19,35 @@ struct ane_device {
 	int ane_id;
 };
 
-struct ane_nn {
-	struct ane_device *ane;
-	uint32_t handle;
-	const struct ane_model *model;
-	void *chans[MAX_TILE_COUNT];
-	void *fifo_chan;
-	int imask[MAX_TILE_COUNT];
-	int omask[MAX_TILE_COUNT];
+struct ane_model {
+	const char *name;
+	const int input_count;
+	const int output_count;
+	const struct anec anec;
+	const uint64_t nchw[ANE_TILE_COUNT][6]; /* N, C, H, W, pS, rS */
 };
 
-#define tile_sz(x)	 (x << TILE_SHIFT)
-#define to_anec(nn)	 (&nn->model->anec)
+struct ane_arr {
+	uint64_t nchw[6];
+	void *data;
+	void *tile;
+};
 
+struct ane_nn {
+	struct ane_device *ane;
+	const struct ane_model *model;
+	uint32_t handle;
+	void *chans[ANE_TILE_COUNT];
+	void *fifo_chan;
+	int src_bdx[ANE_TILE_COUNT];
+	int dst_bdx[ANE_TILE_COUNT];
+	struct ane_arr *arrs[ANE_TILE_COUNT];
+};
+
+#define tile_size(x)	 (x << ANE_TILE_SHIFT)
+#define tile_align(x)	 ((x + ANE_TILE_SIZE - 1) & -ANE_TILE_SIZE)
+
+#define to_anec(nn)	 (&nn->model->anec)
 #define input_count(nn)	 (nn->model->input_count)
 #define output_count(nn) (nn->model->output_count)
 

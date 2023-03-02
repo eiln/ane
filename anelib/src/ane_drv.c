@@ -6,13 +6,13 @@
 #include <unistd.h>
 
 #include <drm.h>
-#include "drm_ane.h"
-
-#include "ane_drv.h"
+#include "ane_dev.h"
 
 /* ane_drv_ funcs interface with the driver.
  * all take *ane and return int status.
  */
+
+#define ANE_SYSFS_PATH "/dev/dri/renderD129"
 
 int ane_drv_device_open(struct ane_device *ane)
 {
@@ -32,54 +32,54 @@ int ane_drv_device_close(struct ane_device *ane)
 	return 0;
 }
 
-static int ane_drv_nn_init(struct ane_device *ane, struct ane_nn *nn)
+static int ane_drv_nn_create(struct ane_device *ane, struct ane_nn *nn)
 {
-	struct drm_ane_nn_init args = {
+	struct drm_ane_nn_create args = {
 		.anec_userptr = (uint64_t)(to_anec(nn)),
 	};
-	int err = ioctl(ane->fd, DRM_IOCTL_ANE_NN_INIT, &args);
+	int err = ioctl(ane->fd, DRM_IOCTL_ANE_NN_CREATE, &args);
 	nn->handle = args.handle;
 	return err;
 }
 
-static int ane_drv_nn_deinit(struct ane_device *ane, struct ane_nn *nn)
+static int ane_drv_nn_free(struct ane_device *ane, struct ane_nn *nn)
 {
-	struct drm_ane_nn_deinit args = { .handle = nn->handle };
-	return ioctl(ane->fd, DRM_IOCTL_ANE_NN_DEINIT, &args);
+	struct drm_ane_nn_free args = { .handle = nn->handle };
+	return ioctl(ane->fd, DRM_IOCTL_ANE_NN_FREE, &args);
 }
 
-static int ane_drv_nn_sync(struct ane_device *ane, struct ane_nn *nn)
+static int ane_drv_nn_map(struct ane_device *ane, struct ane_nn *nn)
 {
-	struct drm_ane_nn_sync args = { .handle = nn->handle };
-	for (int i = 0; i < MAX_TILE_COUNT; i++) {
+	struct drm_ane_nn_map args = { .handle = nn->handle };
+	for (int i = 0; i < ANE_TILE_COUNT; i++) {
 		args.tile_userptr[i] = (uint64_t)nn->chans[i];
 	}
 	args.fifo_userptr = (uint64_t)nn->fifo_chan;
-	return ioctl(ane->fd, DRM_IOCTL_ANE_NN_SYNC, &args);
+	return ioctl(ane->fd, DRM_IOCTL_ANE_NN_MAP, &args);
 }
 
-static int ane_drv_nn_unsync(struct ane_device *ane, struct ane_nn *nn)
+static int ane_drv_nn_unmap(struct ane_device *ane, struct ane_nn *nn)
 {
-	struct drm_ane_nn_unsync args = { .handle = nn->handle };
-	return ioctl(ane->fd, DRM_IOCTL_ANE_NN_UNSYNC, &args);
+	struct drm_ane_nn_unmap args = { .handle = nn->handle };
+	return ioctl(ane->fd, DRM_IOCTL_ANE_NN_UNMAP, &args);
 }
 
 int ane_drv_nn_register(struct ane_device *ane, struct ane_nn *nn)
 {
 	int err;
 
-	err = ane_drv_nn_init(ane, nn);
+	err = ane_drv_nn_create(ane, nn);
 	if (err) {
-		fprintf(stderr, "ANELIB: ane_drv_nn_init failed with 0x%x\n",
+		fprintf(stderr, "ANELIB: ane_drv_nn_create failed with 0x%x\n",
 			err);
 		return err;
 	}
 
-	err = ane_drv_nn_sync(ane, nn);
+	err = ane_drv_nn_map(ane, nn);
 	if (err) {
-		fprintf(stderr, "ANELIB: ane_drv_nn_sync failed with 0x%x\n",
+		fprintf(stderr, "ANELIB: ane_drv_nn_map failed with 0x%x\n",
 			err);
-		ane_drv_nn_deinit(ane, nn);
+		ane_drv_nn_free(ane, nn);
 		return err;
 	}
 
@@ -89,8 +89,8 @@ int ane_drv_nn_register(struct ane_device *ane, struct ane_nn *nn)
 int ane_drv_nn_unregister(struct ane_device *ane, struct ane_nn *nn)
 {
 	int err = 0;
-	err |= ane_drv_nn_unsync(ane, nn);
-	err |= ane_drv_nn_deinit(ane, nn);
+	err |= ane_drv_nn_unmap(ane, nn);
+	err |= ane_drv_nn_free(ane, nn);
 	return err;
 }
 

@@ -5,51 +5,48 @@
 #define __ANE_UTILS_H__
 
 #include <fcntl.h>
+#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 
 static inline void *ane_memalign(size_t size)
 {
-	void *src;
-	int err = posix_memalign(&src, TILE_SIZE, size);
-	if (err) {
-		fprintf(stderr, "ANELIB: posix_memalign failed with 0x%x\n",
-			err);
+	void *data;
+	int err = posix_memalign(&data, 0x4000, size);
+	if (err)
 		return NULL;
-	}
-	return src;
+	return data;
 }
 
 static inline void *ane_zmemalign(size_t size)
 {
-	void *src = ane_memalign(size);
-	if (src == NULL) {
+	void *data = ane_memalign(size);
+	if (data == NULL)
 		return NULL;
-	}
-	memset(src, 0, size);
-	return src;
+	memset(data, 0, size);
+	return data;
 }
 
 static inline void *ane_zmalloc(size_t size)
 {
-	void *src = malloc(size);
-	if (src == NULL) {
+	void *data = malloc(size);
+	if (data == NULL)
 		return NULL;
-	}
-	memset(src, 0, size);
-	return src;
+	memset(data, 0, size);
+	return data;
 }
 
 static inline size_t ane_fread(void *src, size_t size, char *fpath)
 {
+	size_t read;
 	FILE *infp = fopen(fpath, "rb");
 	if (!infp) {
 		fprintf(stderr, "ANELIB: failed to open file %s\n", fpath);
-		return -EINVAL;
+		return -1;
 	}
-	size_t read = fread(src, 1, size, infp);
-	fclose(infp);
 
+	read = fread(src, 1, size, infp);
+	fclose(infp);
 	if (read != size) {
 		fprintf(stderr,
 			"ANELIB: warning: only read 0x%zx/0x%zx of %s\n", read,
@@ -60,14 +57,15 @@ static inline size_t ane_fread(void *src, size_t size, char *fpath)
 
 static inline size_t ane_fwrite(void *src, size_t size, char *fpath)
 {
+	size_t wrote;
 	FILE *outfp = fopen(fpath, "wb");
 	if (!outfp) {
 		fprintf(stderr, "ANELIB: failed to open file %s\n", fpath);
-		return -EINVAL;
+		return -1;
 	}
-	size_t wrote = fwrite(src, 1, size, outfp);
-	fclose(outfp);
 
+	wrote = fwrite(src, 1, size, outfp);
+	fclose(outfp);
 	if (wrote != size) {
 		fprintf(stderr,
 			"ANELIB: warning: only wrote 0x%zx/0x%zx of %s\n",

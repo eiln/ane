@@ -90,7 +90,6 @@ static int ane_mm_put_user_pages(struct ane_node *node)
 static int ane_mm_get_user_pages(struct ane_node *node)
 {
 	long pinned;
-	int err;
 
 	if (!node->userptr)
 		return -EINVAL;
@@ -102,23 +101,12 @@ static int ane_mm_get_user_pages(struct ane_node *node)
 
 	pinned = get_user_pages(node->userptr, node->npages, FOLL_WRITE,
 				node->pages, NULL);
-	if (pinned < 0) {
-		err = pinned;
-		goto put_pages;
-	}
-
-	pr_info("pinned %lu/%d pages\n", pinned, node->npages);
-
-	if (pinned < node->npages) {
-		err = -EINVAL;
-		goto put_pages;
+	if (pinned != node->npages) {
+		ane_mm_put_user_pages(node);
+		return -EFAULT;
 	}
 
 	return 0;
-
-put_pages:
-	ane_mm_put_user_pages(node);
-	return err;
 }
 
 static int ane_iommu_map_pages(struct ane_device *ane, struct ane_node *node)

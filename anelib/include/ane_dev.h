@@ -24,13 +24,7 @@ struct ane_model {
 	const int input_count;
 	const int output_count;
 	const struct anec anec;
-	const uint64_t nchw[ANE_TILE_COUNT][6]; /* N, C, H, W, pS, rS */
-};
-
-struct ane_arr {
-	uint64_t nchw[6];
-	void *data;
-	void *tile;
+	const uint64_t nchw[ANE_TILE_COUNT][6];
 };
 
 struct ane_nn {
@@ -41,7 +35,6 @@ struct ane_nn {
 	void *fifo_chan;
 	int src_bdx[ANE_TILE_COUNT];
 	int dst_bdx[ANE_TILE_COUNT];
-	struct ane_arr *arrs[ANE_TILE_COUNT];
 };
 
 #define tile_size(x)	 (x << ANE_TILE_SHIFT)

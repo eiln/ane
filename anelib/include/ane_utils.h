@@ -42,7 +42,7 @@ static inline size_t ane_fread(void *src, size_t size, char *fpath)
 	FILE *infp = fopen(fpath, "rb");
 	if (!infp) {
 		fprintf(stderr, "ANELIB: failed to open file %s\n", fpath);
-		return -1;
+		return 0;
 	}
 
 	read = fread(src, 1, size, infp);
@@ -61,7 +61,7 @@ static inline size_t ane_fwrite(void *src, size_t size, char *fpath)
 	FILE *outfp = fopen(fpath, "wb");
 	if (!outfp) {
 		fprintf(stderr, "ANELIB: failed to open file %s\n", fpath);
-		return -1;
+		return 0;
 	}
 
 	wrote = fwrite(src, 1, size, outfp);

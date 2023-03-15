@@ -7,7 +7,7 @@
 #include "ane_dev.h"
 #include "ane_utils.h"
 
-struct ane_nn *ane_init(const struct ane_model *model, void *cmd_data);
+struct ane_nn *ane_init(const struct ane_model *model, void *anec_buf);
 void ane_free(struct ane_nn *nn);
 int ane_exec(struct ane_nn *nn);
 

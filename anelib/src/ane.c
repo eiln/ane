@@ -6,13 +6,13 @@
 #include "ane_drv.h"
 #include "ane_utils.h"
 
-static struct ane_device *ane_dev_new(void)
+static struct ane_device *device_new(void)
 {
 	int err;
+
 	struct ane_device *ane = ane_zmalloc(sizeof(struct ane_device));
-	if (!ane) {
+	if (!ane)
 		return NULL;
-	}
 
 	err = ane_drv_device_open(ane);
 	if (err) {
@@ -21,50 +21,50 @@ static struct ane_device *ane_dev_new(void)
 		free(ane);
 		return NULL;
 	}
+
 	return ane;
 }
 
-static void ane_dev_del(struct ane_device *ane)
+static void device_del(struct ane_device *ane)
 {
 	ane_drv_device_close(ane);
 	free(ane);
 }
 
-struct ane_nn *ane_init(const struct ane_model *model, void *cmd_data)
+struct ane_nn *ane_init(const struct ane_model *model, void *anec_buf)
 {
 	int err;
+
 	struct ane_nn *nn = ane_zmalloc(sizeof(struct ane_nn));
-	if (!nn) {
-		return nn;
-	}
+	if (!nn)
+		return NULL;
+
 	nn->model = model;
 
-	err = ane_chan_init(nn, cmd_data);
+	err = ane_chan_init(nn, anec_buf);
 	if (err) {
 		fprintf(stderr, "ANELIB: ane_chan_init failed with 0x%x\n",
 			err);
 		goto free_nn;
 	}
 
-	/* now call driver to init nn */
-	nn->ane = ane_dev_new();
-	if (nn->ane == NULL) {
+	nn->ane = device_new();
+	if (!nn->ane)
 		goto chan_free;
-	}
 
 	err = ane_drv_nn_register(nn->ane, nn);
 	if (err) {
 		fprintf(stderr,
 			"ANELIB: ane_drv_nn_register failed with 0x%x\n", err);
-		goto dev_del;
+		goto device_del;
 	}
 
 	printf("ANELIB: initialized nn %p\n", (void *)nn);
 
 	return nn;
 
-dev_del:
-	ane_dev_del(nn->ane);
+device_del:
+	device_del(nn->ane);
 chan_free:
 	ane_chan_free(nn);
 free_nn:
@@ -76,7 +76,7 @@ void ane_free(struct ane_nn *nn)
 {
 	printf("ANELIB: freeing nn %p\n", (void *)nn);
 	ane_drv_nn_unregister(nn->ane, nn);
-	ane_dev_del(nn->ane);
+	device_del(nn->ane);
 	ane_chan_free(nn);
 	free(nn);
 }

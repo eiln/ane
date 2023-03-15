@@ -14,15 +14,15 @@ static inline void set_fifo_nid(void *td, int nid)
 	memcpy(td, &hdr0, sizeof(uint32_t));
 }
 
-static inline void load_cmd_data(struct ane_nn *nn, void *cmd_data)
+static inline void load_anec_buf(struct ane_nn *nn, void *anec_buf)
 {
 	const struct anec *anec = to_anec(nn);
 
-	memcpy(nn->chans[0], cmd_data, anec->size);
+	memcpy(nn->chans[0], anec_buf, anec->size);
 
 	/* do not fucking overflow */
-	memcpy(nn->fifo_chan, cmd_data, anec->td_size);
-	memcpy(nn->fifo_chan + FIFO_WIDTH, cmd_data, anec->td_size);
+	memcpy(nn->fifo_chan, anec_buf, anec->td_size);
+	memcpy(nn->fifo_chan + FIFO_WIDTH, anec_buf, anec->td_size);
 
 	set_fifo_nid(nn->fifo_chan, ANE_FIFO_NID);
 	set_fifo_nid(nn->fifo_chan + FIFO_WIDTH, ANE_FIFO_NID + FIFO_COUNT);
@@ -104,7 +104,7 @@ error:
 	return -ENOMEM;
 }
 
-int ane_chan_init(struct ane_nn *nn, void *cmd_data)
+int ane_chan_init(struct ane_nn *nn, void *anec_buf)
 {
 	int err = alloc_chans(nn);
 	if (err) {
@@ -112,7 +112,7 @@ int ane_chan_init(struct ane_nn *nn, void *cmd_data)
 		return err;
 	}
 
-	load_cmd_data(nn, cmd_data);
+	load_anec_buf(nn, anec_buf);
 
 	return 0;
 }

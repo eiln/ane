@@ -14,10 +14,9 @@ static struct ane_device *device_new(void)
 	if (!ane)
 		return NULL;
 
-	err = ane_drv_device_open(ane);
+	err = ane_drv_open(ane);
 	if (err) {
-		fprintf(stderr,
-			"ANELIB: ane_drv_device_open failed with 0x%x\n", err);
+		fprintf(stderr, "ANELIB: ane_drv_open failed with 0x%x\n", err);
 		free(ane);
 		return NULL;
 	}
@@ -27,7 +26,7 @@ static struct ane_device *device_new(void)
 
 static void device_del(struct ane_device *ane)
 {
-	ane_drv_device_close(ane);
+	ane_drv_close(ane);
 	free(ane);
 }
 

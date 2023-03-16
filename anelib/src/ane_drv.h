@@ -6,8 +6,8 @@
 
 #include "ane_dev.h"
 
-int ane_drv_device_open(struct ane_device *ane);
-int ane_drv_device_close(struct ane_device *ane);
+int ane_drv_open(struct ane_device *ane);
+int ane_drv_close(struct ane_device *ane);
 
 int ane_drv_nn_register(struct ane_device *ane, struct ane_nn *nn);
 int ane_drv_nn_unregister(struct ane_device *ane, struct ane_nn *nn);

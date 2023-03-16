@@ -14,7 +14,7 @@
 
 #define ANE_SYSFS_PATH "/dev/dri/renderD129"
 
-int ane_drv_device_open(struct ane_device *ane)
+int ane_drv_open(struct ane_device *ane)
 {
 	int fd = open(ANE_SYSFS_PATH, O_RDWR | FD_CLOEXEC, S_IRUSR | S_IWUSR);
 	if (fd < 0) {
@@ -26,7 +26,7 @@ int ane_drv_device_open(struct ane_device *ane)
 	return 0;
 }
 
-int ane_drv_device_close(struct ane_device *ane)
+int ane_drv_close(struct ane_device *ane)
 {
 	close(ane->fd);
 	return 0;

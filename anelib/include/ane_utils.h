@@ -74,4 +74,14 @@ static inline size_t ane_fwrite(void *src, size_t size, char *fpath)
 	return wrote;
 }
 
+static inline int ane_fill_random(void *src, size_t size)
+{
+	int fd = open("/dev/random", O_RDONLY);
+	if (fd < 0)
+		return fd;
+	read(fd, src, size);
+	close(fd);
+	return 0;
+}
+
 #endif /* __ANE_UTILS_H__ */

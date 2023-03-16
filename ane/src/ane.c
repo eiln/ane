@@ -46,14 +46,13 @@ struct ane_nn {
 #define to_nn(gem)  container_of(gem, struct ane_nn, base)
 #define to_anec(nn) (&nn->anec)
 
-static int ane_mm_free_pages(struct ane_node *node)
+static void ane_mm_free_pages(struct ane_node *node)
 {
 	for (u32 i = 0; i < node->npages && node->pages[i] != NULL; i++) {
 		__free_page(node->pages[i]);
 	}
 	kvfree(node->pages);
 	node->pages = NULL;
-	return 0;
 }
 
 static int ane_mm_alloc_pages(struct ane_node *node)
@@ -76,7 +75,7 @@ free_pages:
 	return -ENOMEM;
 }
 
-static int ane_mm_put_user_pages(struct ane_node *node)
+static void ane_mm_put_user_pages(struct ane_node *node)
 {
 	for (u32 i = 0; i < node->npages; i++) {
 		if (node->pages[i])
@@ -84,7 +83,6 @@ static int ane_mm_put_user_pages(struct ane_node *node)
 	}
 	kvfree(node->pages);
 	node->pages = NULL;
-	return 0;
 }
 
 static int ane_mm_get_user_pages(struct ane_node *node)
@@ -161,10 +159,10 @@ unlock:
 	return err;
 }
 
-static int ane_iommu_unmap_pages(struct ane_device *ane, struct ane_node *node)
+static void ane_iommu_unmap_pages(struct ane_device *ane, struct ane_node *node)
 {
 	if (!node->mm)
-		return 0;
+		return;
 
 	mutex_lock(&ane->iommu_lock);
 	for (u32 i = 0; i < node->npages; i++) {
@@ -175,11 +173,10 @@ static int ane_iommu_unmap_pages(struct ane_device *ane, struct ane_node *node)
 	mutex_unlock(&ane->iommu_lock);
 
 	kfree(node->mm);
-
-	return 0;
+	return;
 }
 
-static int ane_iommu_invalidate_tlb(struct ane_device *ane)
+static void ane_iommu_invalidate_tlb(struct ane_device *ane)
 {
 	mutex_lock(&ane->iommu_lock);
 
@@ -202,8 +199,6 @@ static int ane_iommu_invalidate_tlb(struct ane_device *ane)
 	writel(ane->hw->dart.inv, ane->dart2 + ane->hw->dart.cmd);
 
 	mutex_unlock(&ane->iommu_lock);
-
-	return 0;
 }
 
 static int ane_nn_validate_anec(struct ane_device *ane, struct ane_nn *nn)

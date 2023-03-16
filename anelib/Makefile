@@ -1,6 +1,6 @@
 
 CC = gcc
-CFLAGS = -I. -Wall -Werror
+CFLAGS = -I. -Wall -Werror -Wextra -Wpedantic
 
 LIBS = -I/usr/include/libdrm \
 	-I/home/eileen/ane/ane/src/include \

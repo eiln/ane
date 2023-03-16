@@ -7,7 +7,7 @@
 #define FIFO_WIDTH 0x400 // nxtpow2(0x274)
 #define FIFO_COUNT 0x20
 
-static inline void set_fifo_nid(void *td, int nid)
+static inline void set_nid(void *td, int nid)
 {
 	uint32_t hdr0 = *(uint32_t *)td;
 	hdr0 = (hdr0 & 0xf00ffff) | ((nid & 0xff) << 16);
@@ -22,10 +22,10 @@ static inline void load_anec_buf(struct ane_nn *nn, void *anec_buf)
 
 	/* do not fucking overflow */
 	memcpy(nn->fifo_chan, anec_buf, anec->td_size);
-	memcpy(nn->fifo_chan + FIFO_WIDTH, anec_buf, anec->td_size);
+	memcpy((char *)nn->fifo_chan + FIFO_WIDTH, anec_buf, anec->td_size);
 
-	set_fifo_nid(nn->fifo_chan, ANE_FIFO_NID);
-	set_fifo_nid(nn->fifo_chan + FIFO_WIDTH, ANE_FIFO_NID + FIFO_COUNT);
+	set_nid(nn->fifo_chan, ANE_FIFO_NID);
+	set_nid((char *)nn->fifo_chan + FIFO_WIDTH, ANE_FIFO_NID + FIFO_COUNT);
 }
 
 static void free_chans(struct ane_nn *nn)

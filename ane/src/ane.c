@@ -43,7 +43,6 @@ struct ane_nn {
 	int mapped;
 };
 
-#define to_nn(gem)  container_of(gem, struct ane_nn, base)
 #define to_anec(nn) (&nn->anec)
 
 static void ane_mm_free_pages(struct ane_node *node)
@@ -347,7 +346,7 @@ static struct ane_nn *ane_nn_lookup(struct drm_file *file, u32 handle)
 	if (!gem)
 		return NULL;
 
-	return to_nn(gem);
+	return container_of(gem, struct ane_nn, base);
 }
 
 static int ane_nn_free(struct drm_device *drm, void *data,

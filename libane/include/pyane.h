@@ -68,43 +68,6 @@ int pyane_info(struct ane_nn *nn, int *src_count, int *dst_count)
 	return 0;
 }
 
-int pyane_size(struct ane_nn *nn, uint64_t *x0, uint64_t *x1, uint64_t *x2,
-	       uint64_t *x3, uint64_t *x4, uint64_t *x5, uint64_t *x6,
-	       uint64_t *x7, uint64_t *x8, uint64_t *x9, uint64_t *x10,
-	       uint64_t *x11, uint64_t *x12, uint64_t *x13, uint64_t *x14,
-	       uint64_t *x15, uint64_t *x16, uint64_t *x17, uint64_t *x18,
-	       uint64_t *x19, uint64_t *x20, uint64_t *x21, uint64_t *x22,
-	       uint64_t *x23, uint64_t *x24, uint64_t *x25, uint64_t *x26,
-	       uint64_t *x27, uint64_t *x28, uint64_t *x29, uint64_t *x30,
-	       uint64_t *x31, uint64_t *x32, uint64_t *x33, uint64_t *x34,
-	       uint64_t *x35, uint64_t *x36, uint64_t *x37, uint64_t *x38,
-	       uint64_t *x39, uint64_t *x40, uint64_t *x41, uint64_t *x42,
-	       uint64_t *x43, uint64_t *x44, uint64_t *x45, uint64_t *x46,
-	       uint64_t *x47, uint64_t *x48, uint64_t *x49, uint64_t *x50,
-	       uint64_t *x51, uint64_t *x52, uint64_t *x53, uint64_t *x54,
-	       uint64_t *x55, uint64_t *x56, uint64_t *x57, uint64_t *x58,
-	       uint64_t *x59, uint64_t *x60, uint64_t *x61, uint64_t *x62,
-	       uint64_t *x63)
-{
-	uint64_t *is[ANE_TILE_COUNT] = {
-		x0,  x1,  x2,  x3,  x4,	 x5,  x6,  x7,	x8,  x9,  x10,
-		x11, x12, x13, x14, x15, x16, x17, x18, x19, x20, x21,
-		x22, x23, x24, x25, x26, x27, x28, x29, x30, x31
-	};
-	uint64_t *os[ANE_TILE_COUNT] = {
-		x32, x33, x34, x35, x36, x37, x38, x39, x40, x41, x42,
-		x43, x44, x45, x46, x47, x48, x49, x50, x51, x52, x53,
-		x54, x55, x56, x57, x58, x59, x60, x61, x62, x63
-	};
-	for (int i = 0; i < input_count(nn); i++) {
-		*is[i] = input_size(nn, i);
-	}
-	for (int i = 0; i < output_count(nn); i++) {
-		*os[i] = output_size(nn, i);
-	}
-	return 0;
-}
-
 int pyane_nchw(struct ane_nn *nn, uint64_t *x0, uint64_t *x1, uint64_t *x2,
 	       uint64_t *x3, uint64_t *x4, uint64_t *x5, uint64_t *x6,
 	       uint64_t *x7, uint64_t *x8, uint64_t *x9, uint64_t *x10,

@@ -13,6 +13,7 @@ import numpy as np
 from copy import deepcopy
 
 ANE_TILE_COUNT = 0x20
+def tile_align(x): return (x + 0x4000 - 1) & -0x4000
 
 class Driver:
 	def __init__(self, path):
@@ -24,7 +25,6 @@ class Driver:
 		self.lib.pyane_read.argtypes = [c_void_p] + [c_void_p] * ANE_TILE_COUNT
 		self.lib.pyane_tile.argtypes = [c_void_p] + [c_void_p, c_void_p, c_int]
 		self.lib.pyane_info.argtypes = [c_void_p] + [ctypes.POINTER(c_int)] * 2
-		self.lib.pyane_size.argtypes = [c_void_p] + [ctypes.POINTER(c_uint64)] * 1 * ANE_TILE_COUNT * 2
 		self.lib.pyane_nchw.argtypes = [c_void_p] + [ctypes.POINTER(c_uint64)] * 6 * ANE_TILE_COUNT * 2
 		self.handles = {}
 		atexit.register(self.cleanup)
@@ -46,21 +46,18 @@ class Model:
 		self.driver = Driver(path)
 		self.handle = self.driver.register()
 
-		info = [ctypes.c_int() for x in range(2)]
-		self.driver.lib.pyane_info(self.handle, *[byref(info[n]) for n in range(len(info))])
-		self.src_count, self.dst_count = [info[n].value for n in range(len(info))]
-
-		size = [ctypes.c_uint64() for x in range(ANE_TILE_COUNT * 1 * 2)]
-		self.driver.lib.pyane_size(self.handle, *[byref(size[n]) for n in range(len(size))])
-		self.src_size = tuple([size[n].value for n in range(self.src_count)])
-		self.dst_size = tuple([size[n].value for n in range(ANE_TILE_COUNT, ANE_TILE_COUNT + self.dst_count)])
+		info = [ctypes.c_int(), ctypes.c_int()]
+		self.driver.lib.pyane_info(self.handle, byref(info[0]), byref(info[1]))
+		self.src_count, self.dst_count = info[0].value, info[1].value
 
 		nchw = [ctypes.c_uint64() for x in range(ANE_TILE_COUNT * 6 * 2)]
 		self.driver.lib.pyane_nchw(self.handle, *[byref(nchw[n]) for n in range(len(nchw))])
 		self.src_nchw = tuple([tuple(x.value for x in nchw[n*6:(n+1)*6]) for n in range(self.src_count)])
 		self.dst_nchw = tuple([tuple(x.value for x in nchw[n*6:(n+1)*6]) for n in range(ANE_TILE_COUNT, ANE_TILE_COUNT + self.dst_count)])
 
-		self.outputs = [create_string_buffer(self.dst_size[idx]) for idx in range(self.dst_count)] + [b''] * (ANE_TILE_COUNT - self.dst_count)
+		self.src_size = tuple([tile_align(nchw[0] * nchw[1] * nchw[4]) for nchw in self.src_nchw])
+		self.dst_size = tuple([tile_align(nchw[0] * nchw[1] * nchw[4]) for nchw in self.dst_nchw])
+		self.outputs = [create_string_buffer(size) for size in self.dst_size] + [b''] * (ANE_TILE_COUNT - self.dst_count)
 
 	def predict(self, inputs):
 		assert(len(inputs) == self.src_count)

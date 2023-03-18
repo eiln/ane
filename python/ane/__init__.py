@@ -24,8 +24,7 @@ class Driver:
 		self.lib.pyane_send.argtypes = [c_void_p] + [c_void_p] * ANE_TILE_COUNT
 		self.lib.pyane_read.argtypes = [c_void_p] + [c_void_p] * ANE_TILE_COUNT
 		self.lib.pyane_tile.argtypes = [c_void_p] + [c_void_p, c_void_p, c_uint64]
-		self.lib.pyane_info.argtypes = [c_void_p] + [ctypes.POINTER(c_uint64)] * 2
-		self.lib.pyane_nchw.argtypes = [c_void_p] + [ctypes.POINTER(c_uint64)] * 6 * ANE_TILE_COUNT * 2
+		self.lib.pyane_info.argtypes = [c_void_p] + [ctypes.POINTER(c_uint64)] * (2 + (6 * ANE_TILE_COUNT * 2))
 		self.handles = {}
 		atexit.register(self.cleanup)
 
@@ -44,14 +43,12 @@ class Model:
 		self.driver = Driver(os.path.abspath(path))
 		self.handle = self.driver.register()
 
-		info = [ctypes.c_uint64(), ctypes.c_uint64()]
-		self.driver.lib.pyane_info(self.handle, byref(info[0]), byref(info[1]))
-		self.src_count, self.dst_count = info[0].value, info[1].value
-
-		nchw = [ctypes.c_uint64() for x in range(ANE_TILE_COUNT * 6 * 2)]
-		self.driver.lib.pyane_nchw(self.handle, *[byref(nchw[n]) for n in range(len(nchw))])
-		self.src_nchw = tuple([tuple(x.value for x in nchw[n*6:(n+1)*6]) for n in range(self.src_count)])
-		self.dst_nchw = tuple([tuple(x.value for x in nchw[n*6:(n+1)*6]) for n in range(ANE_TILE_COUNT, ANE_TILE_COUNT + self.dst_count)])
+		counts = [ctypes.c_uint64(), ctypes.c_uint64()]
+		nchws = [ctypes.c_uint64() for x in range(ANE_TILE_COUNT * 6 * 2)]
+		self.driver.lib.pyane_info(self.handle, *[byref(x) for x in counts + nchws])
+		self.src_count, self.dst_count = counts[0].value, counts[1].value
+		self.src_nchw = tuple([tuple(x.value for x in nchws[n*6:(n+1)*6]) for n in range(self.src_count)])
+		self.dst_nchw = tuple([tuple(x.value for x in nchws[n*6:(n+1)*6]) for n in range(ANE_TILE_COUNT, ANE_TILE_COUNT + self.dst_count)])
 
 		self.src_size = tuple([tile_align(nchw[0] * nchw[1] * nchw[4]) for nchw in self.src_nchw])
 		self.dst_size = tuple([tile_align(nchw[0] * nchw[1] * nchw[4]) for nchw in self.dst_nchw])

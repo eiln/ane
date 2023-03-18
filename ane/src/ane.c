@@ -48,15 +48,20 @@ struct ane_nn {
 
 static void ane_mm_free_pages(struct ane_node *node)
 {
+	if (!node->pages)
+		return;
+
 	for (u32 i = 0; i < node->npages && node->pages[i] != NULL; i++) {
 		__free_page(node->pages[i]);
 	}
 	kvfree(node->pages);
-	node->pages = NULL;
 }
 
 static int ane_mm_alloc_pages(struct ane_node *node)
 {
+	if (node->pages)
+		return -EBUSY;
+
 	node->pages =
 		kvmalloc_array(node->npages, sizeof(*node->pages), GFP_KERNEL);
 	if (!node->pages)
@@ -77,17 +82,22 @@ free_pages:
 
 static void ane_mm_put_user_pages(struct ane_node *node)
 {
+	if (!node->pages)
+		return;
+
 	for (u32 i = 0; i < node->npages; i++) {
 		if (node->pages[i])
 			put_page(node->pages[i]);
 	}
 	kvfree(node->pages);
-	node->pages = NULL;
 }
 
 static int ane_mm_get_user_pages(struct ane_node *node)
 {
 	long pinned;
+
+	if (node->pages)
+		return -EBUSY;
 
 	if (!node->userptr)
 		return -EINVAL;
@@ -368,26 +378,17 @@ static void __ane_nn_unmap(struct ane_device *ane, struct ane_nn *nn)
 		int bdx = nn->tile_bdx[i];
 		struct ane_node *tile = &nn->tiles[bdx];
 
-		if (nn->req.bar[bdx]) {
-			ane_iommu_unmap_pages(ane, tile);
-			nn->req.bar[bdx] = 0;
-		}
+		ane_iommu_unmap_pages(ane, tile);
 
-		if (tile->pages) {
-			if (tile->type == ANE_TILE_ITM) {
-				ane_mm_free_pages(tile);
-			} else {
-				ane_mm_put_user_pages(tile);
-			}
+		if (tile->type == ANE_TILE_ITM) {
+			ane_mm_free_pages(tile);
+		} else {
+			ane_mm_put_user_pages(tile);
 		}
 	}
 
-	if (nn->req.fifo_addr) {
-		ane_iommu_unmap_pages(ane, &nn->fifo);
-		nn->req.fifo_addr = 0;
-	}
-	if (nn->fifo.pages)
-		ane_mm_put_user_pages(&nn->fifo);
+	ane_iommu_unmap_pages(ane, &nn->fifo);
+	ane_mm_put_user_pages(&nn->fifo);
 
 	/* macos invalidates on a per-network basis */
 	ane_iommu_invalidate_tlb(ane);

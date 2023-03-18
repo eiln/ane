@@ -1,11 +1,12 @@
 
-.PHONY: all anelib clean
+.PHONY: anelib clean
 
 default: anelib
-all: default
 
 anelib:
 	make -C anelib
+install:
+	make -C anelib install
 
 clean:
 	rm -rf build

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 /* Copyright 2022 Eileen Yoon <eyn@gmx.com> */
 
-#ifndef __ANE_FP16_H__
-#define __ANE_FP16_H__
+#ifndef __ANE_F16_H__
+#define __ANE_F16_H__
 
 /* credits to
  * https://stackoverflow.com/a/60047308/20891128
@@ -34,4 +34,4 @@ static inline f16 float_to_f16(const float x) { // IEEE-754 16-bit floating-poin
 }
 // clang-format on
 
-#endif /* __ANE_FP16_H__ */
+#endif /* __ANE_F16_H__ */

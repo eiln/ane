@@ -41,8 +41,7 @@ class Driver:
 
 class Model:
 	def __init__(self, path):
-		if (not os.path.dirname(path)):
-			path = os.path.join(".", path)
+		path = os.path.join(".", path) if (not os.path.dirname(path)) else path
 		self.driver = Driver(path)
 		self.handle = self.driver.register()
 
@@ -61,8 +60,7 @@ class Model:
 
 	def predict(self, inputs):
 		assert(len(inputs) == self.src_count)
-		padded = inputs + [b''] * (ANE_TILE_COUNT - self.src_count)
-		self.driver.lib.pyane_send(self.handle, *padded)
+		self.driver.lib.pyane_send(self.handle, *inputs, *[b''] * (ANE_TILE_COUNT - self.src_count))
 		self.driver.lib.pyane_exec(self.handle)
 		self.driver.lib.pyane_read(self.handle, *self.outputs)
 		return deepcopy(self.outputs[:self.dst_count])

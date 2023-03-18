@@ -4,7 +4,7 @@
 # Copyright 2022 Eileen Yoon <eyn@gmx.com>
 
 import ctypes
-from ctypes import c_void_p, c_uint64, byref
+from ctypes import c_void_p, c_ulong, byref
 from ctypes import create_string_buffer
 
 import os
@@ -23,8 +23,8 @@ class Driver:
 		self.lib.pyane_exec.argtypes = [c_void_p]
 		self.lib.pyane_send.argtypes = [c_void_p] + [c_void_p] * ANE_TILE_COUNT
 		self.lib.pyane_read.argtypes = [c_void_p] + [c_void_p] * ANE_TILE_COUNT
-		self.lib.pyane_tile.argtypes = [c_void_p] + [c_void_p, c_void_p, c_uint64]
-		self.lib.pyane_info.argtypes = [c_void_p] + [ctypes.POINTER(c_uint64)] * (2 + (6 * ANE_TILE_COUNT * 2))
+		self.lib.pyane_tile.argtypes = [c_void_p] + [c_void_p, c_void_p, c_ulong]
+		self.lib.pyane_info.argtypes = [c_void_p] + [ctypes.POINTER(c_ulong)] * (2 + (6 * ANE_TILE_COUNT * 2))
 		self.handles = {}
 		atexit.register(self.cleanup)
 
@@ -43,8 +43,8 @@ class Model:
 		self.driver = Driver(os.path.abspath(path))
 		self.handle = self.driver.register()
 
-		counts = [ctypes.c_uint64(), ctypes.c_uint64()]
-		nchws = [ctypes.c_uint64() for x in range(ANE_TILE_COUNT * 6 * 2)]
+		counts = [ctypes.c_ulong(), ctypes.c_ulong()]
+		nchws = [ctypes.c_ulong() for x in range(ANE_TILE_COUNT * 6 * 2)]
 		self.driver.lib.pyane_info(self.handle, *[byref(x) for x in counts + nchws])
 		self.src_count, self.dst_count = counts[0].value, counts[1].value
 		self.src_nchw = tuple([tuple(x.value for x in nchws[n*6:(n+1)*6]) for n in range(self.src_count)])

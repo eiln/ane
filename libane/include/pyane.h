@@ -7,6 +7,11 @@
 #include "ane.h"
 #include "ane_nchw.h"
 
+void *pyane_init(void);
+int pyane_free(struct ane_nn *nn);
+int pyane_exec(struct ane_nn *nn);
+int pyane_tile(struct ane_nn *nn, void *data, void *tile, uint64_t idx);
+
 int pyane_free(struct ane_nn *nn)
 {
 	ane_free(nn);

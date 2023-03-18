@@ -41,7 +41,7 @@ static inline size_t ane_fread(void *src, size_t size, char *fpath)
 	size_t read;
 	FILE *infp = fopen(fpath, "rb");
 	if (!infp) {
-		fprintf(stderr, "ANELIB: failed to open file %s\n", fpath);
+		fprintf(stderr, "LIBANE: failed to open file %s\n", fpath);
 		return 0;
 	}
 
@@ -49,7 +49,7 @@ static inline size_t ane_fread(void *src, size_t size, char *fpath)
 	fclose(infp);
 	if (read != size) {
 		fprintf(stderr,
-			"ANELIB: warning: only read 0x%zx/0x%zx of %s\n", read,
+			"LIBANE: warning: only read 0x%zx/0x%zx of %s\n", read,
 			size, fpath);
 	}
 	return read;
@@ -60,7 +60,7 @@ static inline size_t ane_fwrite(void *src, size_t size, char *fpath)
 	size_t wrote;
 	FILE *outfp = fopen(fpath, "wb");
 	if (!outfp) {
-		fprintf(stderr, "ANELIB: failed to open file %s\n", fpath);
+		fprintf(stderr, "LIBANE: failed to open file %s\n", fpath);
 		return 0;
 	}
 
@@ -68,7 +68,7 @@ static inline size_t ane_fwrite(void *src, size_t size, char *fpath)
 	fclose(outfp);
 	if (wrote != size) {
 		fprintf(stderr,
-			"ANELIB: warning: only wrote 0x%zx/0x%zx of %s\n",
+			"LIBANE: warning: only wrote 0x%zx/0x%zx of %s\n",
 			wrote, size, fpath);
 	}
 	return wrote;

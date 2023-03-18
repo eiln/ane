@@ -18,7 +18,7 @@ int ane_drv_open(struct ane_device *ane)
 {
 	int fd = open(ANE_SYSFS_PATH, O_RDWR | FD_CLOEXEC, S_IRUSR | S_IWUSR);
 	if (fd < 0) {
-		fprintf(stderr, "ANELIB: failed to open sysfs %s\n",
+		fprintf(stderr, "LIBANE: failed to open sysfs %s\n",
 			ANE_SYSFS_PATH);
 		return -ENODEV;
 	}
@@ -70,14 +70,14 @@ int ane_drv_nn_register(struct ane_device *ane, struct ane_nn *nn)
 
 	err = ane_drv_nn_create(ane, nn);
 	if (err) {
-		fprintf(stderr, "ANELIB: ane_drv_nn_create failed with 0x%x\n",
+		fprintf(stderr, "LIBANE: ane_drv_nn_create failed with 0x%x\n",
 			err);
 		return err;
 	}
 
 	err = ane_drv_nn_map(ane, nn);
 	if (err) {
-		fprintf(stderr, "ANELIB: ane_drv_nn_map failed with 0x%x\n",
+		fprintf(stderr, "LIBANE: ane_drv_nn_map failed with 0x%x\n",
 			err);
 		ane_drv_nn_free(ane, nn);
 		return err;

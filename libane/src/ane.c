@@ -16,7 +16,7 @@ static struct ane_device *device_new(void)
 
 	err = ane_drv_open(ane);
 	if (err) {
-		fprintf(stderr, "ANELIB: ane_drv_open failed with 0x%x\n", err);
+		fprintf(stderr, "LIBANE: ane_drv_open failed with 0x%x\n", err);
 		free(ane);
 		return NULL;
 	}
@@ -42,7 +42,7 @@ struct ane_nn *ane_init(const struct ane_model *model, void *anec_buf)
 
 	err = ane_chan_init(nn, anec_buf);
 	if (err) {
-		fprintf(stderr, "ANELIB: ane_chan_init failed with 0x%x\n",
+		fprintf(stderr, "LIBANE: ane_chan_init failed with 0x%x\n",
 			err);
 		goto free_nn;
 	}
@@ -54,11 +54,11 @@ struct ane_nn *ane_init(const struct ane_model *model, void *anec_buf)
 	err = ane_drv_nn_register(nn->ane, nn);
 	if (err) {
 		fprintf(stderr,
-			"ANELIB: ane_drv_nn_register failed with 0x%x\n", err);
+			"LIBANE: ane_drv_nn_register failed with 0x%x\n", err);
 		goto device_del;
 	}
 
-	printf("ANELIB: initialized nn %p\n", (void *)nn);
+	printf("LIBANE: initialized nn %p\n", (void *)nn);
 
 	return nn;
 
@@ -73,7 +73,7 @@ free_nn:
 
 void ane_free(struct ane_nn *nn)
 {
-	printf("ANELIB: freeing nn %p\n", (void *)nn);
+	printf("LIBANE: freeing nn %p\n", (void *)nn);
 	ane_drv_nn_unregister(nn->ane, nn);
 	device_del(nn->ane);
 	ane_chan_free(nn);

@@ -1,12 +1,11 @@
 
-.PHONY: anelib clean
+.PHONY: libane clean
 
-default: anelib
-
-anelib:
-	make -C anelib
+default: libane
+libane:
+	make -C libane
 install:
-	make -C anelib install
+	make -C libane install
 
 clean:
 	rm -rf build

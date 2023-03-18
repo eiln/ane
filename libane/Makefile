@@ -1,4 +1,4 @@
-LIB_NAME = anelib
+LIB_NAME = libane
 
 CC = gcc
 CFLAGS = -I. -Wall -Werror -Wextra -Wpedantic
@@ -14,13 +14,13 @@ OBJECTS = $(BUILD_DIR)/ane.o \
 	$(BUILD_DIR)/ane_chan.o \
 	$(BUILD_DIR)/ane_drv.o
 
-.PHONY: anelib install
+.PHONY: libane install
 
-anelib: $(OBJECTS)
+libane: $(OBJECTS)
 	ar cr $(BUILD_DIR)/${LIB_NAME}.a $(OBJECTS)
 	ld -r $(OBJECTS) -o $(BUILD_DIR)/${LIB_NAME}.o
 
-install: anelib
+install: libane
 	install $(BUILD_DIR)/${LIB_NAME}.a ${DESTDIR}/usr/lib
 	install $(BUILD_DIR)/${LIB_NAME}.o ${DESTDIR}/usr/lib
 	mkdir -p ${DESTDIR}/usr/include/${LIB_NAME}

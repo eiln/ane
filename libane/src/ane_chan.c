@@ -61,7 +61,7 @@ static int alloc_chans(struct ane_nn *nn)
 	}
 
 	if (ic != input_count(nn) || oc != output_count(nn)) {
-		fprintf(stderr, "ANELIB: invalid src/dst setup\n");
+		fprintf(stderr, "LIBANE: invalid src/dst setup\n");
 		return -EINVAL;
 	}
 
@@ -81,7 +81,7 @@ static int alloc_chans(struct ane_nn *nn)
 		if (!nn->chans[bdx])
 			goto error;
 
-		printf("ANELIB: allocated input chan %d/%d size 0x%zx\n", i + 1,
+		printf("LIBANE: allocated input chan %d/%d size 0x%zx\n", i + 1,
 		       input_count(nn), size);
 	}
 
@@ -93,7 +93,7 @@ static int alloc_chans(struct ane_nn *nn)
 		if (!nn->chans[bdx])
 			goto error;
 
-		printf("ANELIB: allocated output chan %d/%d size 0x%zx\n",
+		printf("LIBANE: allocated output chan %d/%d size 0x%zx\n",
 		       i + 1, output_count(nn), size);
 	}
 
@@ -108,7 +108,7 @@ int ane_chan_init(struct ane_nn *nn, void *anec_buf)
 {
 	int err = alloc_chans(nn);
 	if (err) {
-		fprintf(stderr, "ANELIB: failed to alloc chans, 0x%x\n", err);
+		fprintf(stderr, "LIBANE: failed to alloc chans, 0x%x\n", err);
 		return err;
 	}
 

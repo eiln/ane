@@ -41,8 +41,7 @@ class Driver:
 
 class Model:
 	def __init__(self, path):
-		path = os.path.join(".", path) if (not os.path.dirname(path)) else path
-		self.driver = Driver(path)
+		self.driver = Driver(os.path.abspath(path))
 		self.handle = self.driver.register()
 
 		info = [ctypes.c_uint64(), ctypes.c_uint64()]

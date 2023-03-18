@@ -19,7 +19,7 @@ int pyane_exec(struct ane_nn *nn)
 	return err;
 }
 
-int pyane_tile(struct ane_nn *nn, void *data, void *tile, int idx)
+int pyane_tile(struct ane_nn *nn, void *data, void *tile, uint64_t idx)
 {
 	nchw_tile(data, tile, (uint64_t *)nn->model->nchw[nn->src_bdx[idx]]);
 	return 0;
@@ -61,7 +61,7 @@ int pyane_read(struct ane_nn *nn, void *x0, void *x1, void *x2, void *x3,
 	return 0;
 }
 
-int pyane_info(struct ane_nn *nn, int *src_count, int *dst_count)
+int pyane_info(struct ane_nn *nn, uint64_t *src_count, uint64_t *dst_count)
 {
 	*src_count = input_count(nn);
 	*dst_count = output_count(nn);

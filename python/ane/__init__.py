@@ -4,7 +4,7 @@
 # Copyright 2022 Eileen Yoon <eyn@gmx.com>
 
 import ctypes
-from ctypes import c_void_p, c_int, c_uint64, byref
+from ctypes import c_void_p, c_uint64, byref
 from ctypes import create_string_buffer
 
 import os
@@ -23,8 +23,8 @@ class Driver:
 		self.lib.pyane_exec.argtypes = [c_void_p]
 		self.lib.pyane_send.argtypes = [c_void_p] + [c_void_p] * ANE_TILE_COUNT
 		self.lib.pyane_read.argtypes = [c_void_p] + [c_void_p] * ANE_TILE_COUNT
-		self.lib.pyane_tile.argtypes = [c_void_p] + [c_void_p, c_void_p, c_int]
-		self.lib.pyane_info.argtypes = [c_void_p] + [ctypes.POINTER(c_int)] * 2
+		self.lib.pyane_tile.argtypes = [c_void_p] + [c_void_p, c_void_p, c_uint64]
+		self.lib.pyane_info.argtypes = [c_void_p] + [ctypes.POINTER(c_uint64)] * 2
 		self.lib.pyane_nchw.argtypes = [c_void_p] + [ctypes.POINTER(c_uint64)] * 6 * ANE_TILE_COUNT * 2
 		self.handles = {}
 		atexit.register(self.cleanup)
@@ -45,7 +45,7 @@ class Model:
 		self.driver = Driver(path)
 		self.handle = self.driver.register()
 
-		info = [ctypes.c_int(), ctypes.c_int()]
+		info = [ctypes.c_uint64(), ctypes.c_uint64()]
 		self.driver.lib.pyane_info(self.handle, byref(info[0]), byref(info[1]))
 		self.src_count, self.dst_count = info[0].value, info[1].value
 

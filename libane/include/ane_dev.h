@@ -37,8 +37,11 @@ struct ane_nn {
 	int dst_bdx[ANE_TILE_COUNT];
 };
 
-#define tile_size(x)	 (x << ANE_TILE_SHIFT)
-#define tile_align(x)	 ((x + ANE_TILE_SIZE - 1) & -ANE_TILE_SIZE)
+#define TILE_SHIFT	 0xe
+#define TILE_SIZE	 0x4000
+
+#define tile_size(x)	 (x << TILE_SHIFT)
+#define tile_align(x)	 ((x + TILE_SIZE - 1) & -TILE_SIZE)
 
 #define to_anec(nn)	 (&nn->model->anec)
 #define input_count(nn)	 (nn->model->input_count)

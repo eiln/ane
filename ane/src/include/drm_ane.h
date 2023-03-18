@@ -9,8 +9,6 @@ extern "C" {
 #endif
 
 /* shared constants */
-#define ANE_TILE_SIZE  0x4000
-#define ANE_TILE_SHIFT 0xe
 #define ANE_TILE_COUNT 0x20
 #define ANE_FIFO_NID   0x40
 #define ANE_CMD_GRAN   0x10

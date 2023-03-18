@@ -65,7 +65,7 @@ static int alloc_chans(struct ane_nn *nn)
 		return -EINVAL;
 	}
 
-	nn->fifo_chan = ane_zmemalign(ANE_TILE_SIZE);
+	nn->fifo_chan = ane_zmemalign(TILE_SIZE);
 	if (!nn->fifo_chan)
 		goto error;
 

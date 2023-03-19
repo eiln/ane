@@ -11,7 +11,6 @@ int ane_drv_close(struct ane_device *ane);
 
 int ane_drv_nn_register(struct ane_device *ane, struct ane_nn *nn);
 int ane_drv_nn_unregister(struct ane_device *ane, struct ane_nn *nn);
-
 int ane_drv_nn_exec(struct ane_device *ane, struct ane_nn *nn);
 
 #endif /* __ANE_DRV_H__ */

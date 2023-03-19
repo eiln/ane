@@ -1,7 +1,7 @@
 LIB_NAME = libane
 
 CC = gcc
-CFLAGS = -I. -Wall -Werror -Wextra -Wpedantic
+CFLAGS = -I. -Wall -Werror -Wextra -Wpedantic -O2
 
 LIBS = -I/usr/include/libdrm \
 	-I/home/eileen/ane/ane/src/include \

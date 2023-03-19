@@ -1,16 +1,12 @@
 // SPDX-License-Identifier: MIT
 /* Copyright 2022 Eileen Yoon <eyn@gmx.com> */
 
+#include <drm.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-#include <drm.h>
 #include "ane_dev.h"
-
-/* ane_drv_ funcs interface with the driver.
- * all take *ane and return int status.
- */
 
 #define ANE_SYSFS_PATH "/dev/dri/renderD129"
 
@@ -35,7 +31,7 @@ int ane_drv_close(struct ane_device *ane)
 static int ane_drv_nn_create(struct ane_device *ane, struct ane_nn *nn)
 {
 	struct drm_ane_nn_create args = {
-		.anec_userptr = (uint64_t)(to_anec(nn)),
+		.anec_userptr = (uint64_t)to_anec(nn),
 	};
 	int err = ioctl(ane->fd, DRM_IOCTL_ANE_NN_CREATE, &args);
 	nn->handle = args.handle;

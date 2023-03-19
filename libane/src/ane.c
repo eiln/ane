@@ -2,9 +2,8 @@
 /* Copyright 2022 Eileen Yoon <eyn@gmx.com> */
 
 #include "ane_chan.h"
-#include "ane_dev.h"
 #include "ane_drv.h"
-#include "ane_utils.h"
+#include "ane_mem.h"
 
 static struct ane_device *device_new(void)
 {
@@ -30,7 +29,7 @@ static void device_del(struct ane_device *ane)
 	free(ane);
 }
 
-struct ane_nn *ane_init(const struct ane_model *model, void *anec_buf)
+struct ane_nn *ane_init(const struct ane_model *model)
 {
 	int err;
 
@@ -40,7 +39,7 @@ struct ane_nn *ane_init(const struct ane_model *model, void *anec_buf)
 
 	nn->model = model;
 
-	err = ane_chan_init(nn, anec_buf);
+	err = ane_chan_init(nn);
 	if (err) {
 		fprintf(stderr, "LIBANE: ane_chan_init failed with 0x%x\n",
 			err);
@@ -83,4 +82,16 @@ void ane_free(struct ane_nn *nn)
 int ane_exec(struct ane_nn *nn)
 {
 	return ane_drv_nn_exec(nn->ane, nn);
+}
+
+void ane_send(struct ane_nn *nn, void *from, int idx)
+{
+	int bdx = nn->src_bdx[idx];
+	memcpy(nn->chans[bdx], from, tile_shift(to_anec(nn)->tiles[bdx]));
+}
+
+void ane_read(struct ane_nn *nn, void *to, int idx)
+{
+	int bdx = nn->dst_bdx[idx];
+	memcpy(to, nn->chans[bdx], tile_shift(to_anec(nn)->tiles[bdx]));
 }

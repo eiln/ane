@@ -5,7 +5,7 @@
 #define __PYANE_H__
 
 #include "ane.h"
-#include "ane_nchw.h"
+#include "ane_tile.h"
 
 void *pyane_init(void);
 int pyane_free(struct ane_nn *nn);
@@ -26,7 +26,11 @@ int pyane_exec(struct ane_nn *nn)
 
 int pyane_tile(struct ane_nn *nn, void *data, void *tile, unsigned long idx)
 {
-	nchw_tile(data, tile, (uint64_t *)nn->model->nchw[nn->src_bdx[idx]]);
+	int bdx = nn->src_bdx[idx];
+	const struct ane_model *model = nn->model;
+	ane_tile(data, tile, model->nchw[bdx][0], model->nchw[bdx][1],
+		 model->nchw[bdx][2], model->nchw[bdx][3], model->nchw[bdx][4],
+		 model->nchw[bdx][5]);
 	return 0;
 }
 

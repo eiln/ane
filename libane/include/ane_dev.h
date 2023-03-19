@@ -8,7 +8,6 @@
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 #include "drm_ane.h"
 
@@ -21,9 +20,10 @@ struct ane_device {
 
 struct ane_model {
 	const char *name;
+	const void *data;
+	const struct anec anec;
 	const int input_count;
 	const int output_count;
-	const struct anec anec;
 	const uint64_t nchw[ANE_TILE_COUNT][6];
 };
 
@@ -36,12 +36,6 @@ struct ane_nn {
 	int src_bdx[ANE_TILE_COUNT];
 	int dst_bdx[ANE_TILE_COUNT];
 };
-
-#define TILE_SHIFT	 0xe
-#define TILE_SIZE	 0x4000
-
-#define tile_size(x)	 (x << TILE_SHIFT)
-#define tile_align(x)	 ((x + TILE_SIZE - 1) & -TILE_SIZE)
 
 #define to_anec(nn)	 (&nn->model->anec)
 #define input_count(nn)	 (nn->model->input_count)

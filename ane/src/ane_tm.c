@@ -124,11 +124,6 @@ int ane_tm_enqueue(struct ane_device *ane, struct ane_engine_req *req)
 	tq_write32(ane, TQ_ADDR1(qid), req->fifo_addr);
 	tq_write32(ane, TQ_NID1(qid), (req->nid & 0xff) << 8 | 1);
 
-	/* clear other slot */
-	tq_write32(ane, TQ_SIZE2(qid), 0x0);
-	tq_write32(ane, TQ_ADDR2(qid), 0x0);
-	tq_write32(ane, TQ_NID2(qid), 0x0);
-
 	return 0;
 }
 

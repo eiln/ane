@@ -807,8 +807,8 @@ static int ane_platform_probe(struct platform_device *pdev)
 
 	ane_tm_enable(ane);
 
-	/* measured 3sec on macos */
-	pm_runtime_set_autosuspend_delay(ane->dev, 3000);
+	/* measured 3s on macos, but 1s seems more stable */
+	pm_runtime_set_autosuspend_delay(ane->dev, 1000);
 	pm_runtime_use_autosuspend(ane->dev);
 
 	pm_runtime_get_noresume(ane->dev);

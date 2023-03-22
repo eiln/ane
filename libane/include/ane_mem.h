@@ -10,8 +10,8 @@
 #define TILE_SHIFT    0xEUL
 #define TILE_SIZE     0x4000UL
 
-#define tile_shift(x) (x << TILE_SHIFT)
-#define tile_align(x) ((x + TILE_SIZE - 1) & -TILE_SIZE)
+#define tile_shift(x) ((unsigned long)(x) << TILE_SHIFT)
+#define tile_align(x) (((unsigned long)(x) + TILE_SIZE - 1) & -TILE_SIZE)
 
 static inline void *ane_zmalloc(unsigned long size)
 {

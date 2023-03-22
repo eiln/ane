@@ -12,7 +12,8 @@ SRC_DIR = ./src
 
 OBJECTS = $(BUILD_DIR)/ane.o \
 	$(BUILD_DIR)/ane_chan.o \
-	$(BUILD_DIR)/ane_drv.o
+	$(BUILD_DIR)/ane_drv.o \
+	$(BUILD_DIR)/ane_tile.o
 
 .PHONY: libane install
 

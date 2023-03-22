@@ -5,12 +5,10 @@
 #define __PYANE_H__
 
 #include "ane.h"
-#include "ane_tile.h"
 
 void *pyane_init(void);
 int pyane_free(struct ane_nn *nn);
 int pyane_exec(struct ane_nn *nn);
-int pyane_tile(struct ane_nn *nn, void *data, void *tile, unsigned long idx);
 
 int pyane_free(struct ane_nn *nn)
 {
@@ -22,16 +20,6 @@ int pyane_exec(struct ane_nn *nn)
 {
 	int err = ane_exec(nn);
 	return err;
-}
-
-int pyane_tile(struct ane_nn *nn, void *data, void *tile, unsigned long idx)
-{
-	int bdx = nn->src_bdx[idx];
-	const struct ane_model *model = nn->model;
-	ane_tile(data, tile, model->nchw[bdx][0], model->nchw[bdx][1],
-		 model->nchw[bdx][2], model->nchw[bdx][3], model->nchw[bdx][4],
-		 model->nchw[bdx][5]);
-	return 0;
 }
 
 // im sorry
@@ -48,7 +36,7 @@ int pyane_send(struct ane_nn *nn, void *x0, void *x1, void *x2, void *x3,
 				     x16, x17, x18, x19, x20, x21, x22, x23,
 				     x24, x25, x26, x27, x28, x29, x30, x31 };
 	for (int i = 0; i < input_count(nn); i++) {
-		ane_send(nn, xs[i], i);
+		ane_tile_and_send(nn, xs[i], i);
 	}
 	return 0;
 }

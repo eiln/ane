@@ -42,7 +42,7 @@ static inline struct ane_buf *ane_buf_alloc(const uint64_t n, const uint64_t c,
 	*(uint64_t *)&buf->r = r;
 
 	*(uint64_t *)&buf->elem = n * c * h * w;
-	*(uint64_t *)&buf->data_size = n * c * h * w * sizeof(f16);
+	*(uint64_t *)&buf->data_size = n * c * h * w * sizeof(uint16_t);
 	*(uint64_t *)&buf->tile_size = tile_align(n * c * p);
 
 	buf->data = ane_zmemalign(buf->data_size);
@@ -68,27 +68,28 @@ static inline void ane_buf_free(struct ane_buf *buf)
 	free(buf);
 }
 
-static inline f16 ane_buf_get(const struct ane_buf *buf, const uint64_t n,
-			      const uint64_t c, const uint64_t h,
-			      const uint64_t w)
+static inline uint16_t ane_buf_get(const struct ane_buf *buf, const uint64_t n,
+				   const uint64_t c, const uint64_t h,
+				   const uint64_t w)
 {
-	f16(*array)[buf->n][buf->c][buf->h][buf->w] =
-		(f16(*)[buf->n][buf->c][buf->h][buf->w])buf->data;
+	uint16_t(*array)[buf->n][buf->c][buf->h][buf->w] =
+		(uint16_t(*)[buf->n][buf->c][buf->h][buf->w])buf->data;
 	return (*array)[n][c][h][w];
 }
 
 static inline void ane_buf_set(const struct ane_buf *buf, const uint64_t n,
 			       const uint64_t c, const uint64_t h,
-			       const uint64_t w, const f16 val)
+			       const uint64_t w, const uint16_t val)
 {
-	f16(*array)[buf->n][buf->c][buf->h][buf->w] =
-		(f16(*)[buf->n][buf->c][buf->h][buf->w])buf->data;
+	uint16_t(*array)[buf->n][buf->c][buf->h][buf->w] =
+		(uint16_t(*)[buf->n][buf->c][buf->h][buf->w])buf->data;
 	(*array)[n][c][h][w] = val;
 }
 
-static inline void ane_buf_set_all(const struct ane_buf *buf, const f16 val)
+static inline void ane_buf_set_all(const struct ane_buf *buf,
+				   const uint16_t val)
 {
-	f16 *data = (f16 *)buf->data;
+	uint16_t *data = (uint16_t *)buf->data;
 	for (uint64_t i = 0; i < buf->elem; i++) {
 		data[i] = val;
 	}
@@ -123,17 +124,17 @@ static inline void ane_buf_fwrite(const struct ane_buf *buf, char *fname)
 
 static inline void ane_buf_from_float(const struct ane_buf *buf, float *src)
 {
-	f16 *dst = (f16 *)buf->data;
+	uint16_t *dst = (uint16_t *)buf->data;
 	for (uint64_t i = 0; i < buf->elem; i++) {
-		dst[i] = float_to_f16(src[i]);
+		dst[i] = float_to_half(src[i]);
 	}
 }
 
 static inline void ane_buf_to_float(const struct ane_buf *buf, float *dst)
 {
-	f16 *src = (f16 *)buf->data;
+	uint16_t *src = (uint16_t *)buf->data;
 	for (uint64_t i = 0; i < buf->elem; i++) {
-		dst[i] = f16_to_float(src[i]);
+		dst[i] = half_to_float(src[i]);
 	}
 }
 

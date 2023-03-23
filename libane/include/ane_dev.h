@@ -5,7 +5,6 @@
 #define __ANE_DEV_H__
 
 #include <asm/types.h>
-#include <errno.h>
 #include <stdint.h>
 
 #include "drm_ane.h"

@@ -4,7 +4,9 @@
 #ifndef __ANE_PRIV_H__
 #define __ANE_PRIV_H__
 
+#include <errno.h>
 #include <stdio.h>
+
 #include "ane_dev.h"
 
 #define to_anec(nn)	   (&nn->model->anec)

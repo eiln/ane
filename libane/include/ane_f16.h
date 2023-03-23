@@ -39,4 +39,22 @@ static inline uint16_t float_to_half(const float x)
 }
 // clang-format on
 
+#define float_to_half_array(src, dst, elem)   \
+	uint16_t dst[(elem)];                 \
+	for (uint64_t i = 0; i < (elem); i++) \
+		dst[i] = float_to_half(src[i]);
+
+#define half_to_float_array(src, dst, elem)   \
+	float dst[(elem)];                    \
+	for (uint64_t i = 0; i < (elem); i++) \
+		dst[i] = half_to_float(src[i]);
+
+#define float_to_half_c_array(src, dst) \
+	float_to_half_array(src, dst, (sizeof(src) / sizeof(float)))
+
+#define half_to_float_c_array(src, dst) \
+	half_to_float_array(src, dst, (sizeof(src) / sizeof(uint16_t)))
+
+#define init_half_array(name, elem) uint16_t name[(elem)]
+
 #endif /* __ANE_F16_H__ */

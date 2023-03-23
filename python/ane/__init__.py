@@ -7,7 +7,7 @@ import os
 import atexit
 import ctypes
 import numpy as np
-from ctypes import c_void_p, c_ulong, byref
+from ctypes import c_void_p, c_ulong
 
 TILE_COUNT = 0x20
 def align16k(x): return (x + 0x4000 - 1) & -0x4000
@@ -39,18 +39,16 @@ class Model:
 		self.driver = Driver(os.path.abspath(path))
 		self.handle = self.driver.register()
 		counts, nchws = [c_ulong(), c_ulong()], [c_ulong() for x in range(TILE_COUNT * 6 * 2)]
-		self.driver.lib.pyane_info(self.handle, *[byref(x) for x in counts + nchws])
+		self.driver.lib.pyane_info(self.handle, *[ctypes.byref(x) for x in counts + nchws])
 		self.src_count, self.dst_count = counts[0].value, counts[1].value
 		self.src_nchw = tuple([tuple(x.value for x in nchws[n*6:(n+1)*6]) for n in range(self.src_count)])
 		self.dst_nchw = tuple([tuple(x.value for x in nchws[n*6:(n+1)*6]) for n in range(TILE_COUNT, TILE_COUNT + self.dst_count)])
-		self.src_size = tuple([align16k(nchw[0] * nchw[1] * nchw[4]) for nchw in self.src_nchw])
-		self.dst_size = tuple([align16k(nchw[0] * nchw[1] * nchw[4]) for nchw in self.dst_nchw])
-		self.outputs = [ctypes.create_string_buffer(size) for size in self.dst_size] + [b''] * (TILE_COUNT - self.dst_count)
+		self.outputs = [ctypes.create_string_buffer(align16k(nchw[0] * nchw[1] * nchw[4])) for nchw in self.dst_nchw] + [b''] * (TILE_COUNT - self.dst_count)
 
 	def predict(self, inarrs):  # list of numpy arrays
+		assert(len(inarrs) == self.src_count)
 		assert(all(((arr.dtype == np.float16) and (arr.shape == self.src_nchw[idx][:4])) for idx,arr in enumerate(inarrs)))
-		inputs = [arr.tobytes(order='C') for arr in inarrs]
-		self.driver.lib.pyane_send(self.handle, *inputs, *[b''] * (TILE_COUNT - self.src_count))
+		self.driver.lib.pyane_send(self.handle, *[arr.tobytes(order='C') for arr in inarrs], *[b''] * (TILE_COUNT - self.src_count))
 		self.driver.lib.pyane_exec(self.handle)
 		self.driver.lib.pyane_read(self.handle, *self.outputs)
 		return [self.tile2arr(self.outputs[idx], idx) for idx in range(self.dst_count)]

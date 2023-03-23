@@ -4,6 +4,7 @@
 #include "ane_chan.h"
 #include "ane_drv.h"
 #include "ane_mem.h"
+#include "ane_priv.h"
 
 static struct ane_device *device_new(void)
 {
@@ -84,14 +85,20 @@ int ane_exec(struct ane_nn *nn)
 	return ane_drv_nn_exec(nn->ane, nn);
 }
 
-void ane_send(struct ane_nn *nn, void *from, int idx)
+int ane_send(struct ane_nn *nn, void *from, const int idx)
 {
 	int bdx = nn->src_bdx[idx];
+	if (src_idx_check(nn, idx))
+		return -EINVAL;
 	memcpy(nn->chans[bdx], from, tile_shift(to_anec(nn)->tiles[bdx]));
+	return 0;
 }
 
-void ane_read(struct ane_nn *nn, void *to, int idx)
+int ane_read(struct ane_nn *nn, void *to, const int idx)
 {
 	int bdx = nn->dst_bdx[idx];
+	if (dst_idx_check(nn, idx))
+		return -EINVAL;
 	memcpy(to, nn->chans[bdx], tile_shift(to_anec(nn)->tiles[bdx]));
+	return 0;
 }

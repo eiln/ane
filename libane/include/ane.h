@@ -14,8 +14,8 @@ struct ane_nn *ane_init(const struct ane_model *model);
 void ane_free(struct ane_nn *nn);
 int ane_exec(struct ane_nn *nn);
 
-void ane_send(struct ane_nn *nn, void *from, int idx);
-void ane_read(struct ane_nn *nn, void *to, int idx);
+int ane_send(struct ane_nn *nn, void *from, const int idx);
+int ane_read(struct ane_nn *nn, void *to, const int idx);
 
 int ane_tile_and_send(struct ane_nn *nn, void *from, const int idx);
 int ane_untile_and_read(struct ane_nn *nn, void *to, const int idx);

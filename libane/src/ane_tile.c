@@ -4,6 +4,7 @@
 #include "ane.h"
 #include "ane_dev.h"
 #include "ane_mem.h"
+#include "ane_priv.h"
 
 static inline void ane_tile(void *data, void *tile, const uint64_t N,
 			    const uint64_t C, const uint64_t H,
@@ -68,12 +69,10 @@ int ane_tile_and_send(struct ane_nn *nn, void *from, const int idx)
 	const int bdx = nn->src_bdx[idx];
 	void *tile = NULL;
 
-	if (idx >= input_count(nn)) {
-		fprintf(stderr, "LIBANE: invalid input index\n");
+	if (src_idx_check(nn, idx))
 		return -EINVAL;
-	}
 
-	tile = ane_zmemalign(tile_shift(to_anec(nn)->tiles[bdx]));
+	tile = ane_zmemalign(tile_size(nn, bdx));
 	if (!tile) {
 		fprintf(stderr, "LIBANE: not enough mem to send input\n");
 		return -ENOMEM;
@@ -95,12 +94,10 @@ int ane_untile_and_read(struct ane_nn *nn, void *to, const int idx)
 	const int bdx = nn->dst_bdx[idx];
 	void *tile = NULL;
 
-	if (idx >= output_count(nn)) {
-		fprintf(stderr, "LIBANE: invalid output index\n");
+	if (dst_idx_check(nn, idx))
 		return -EINVAL;
-	}
 
-	tile = ane_zmemalign(tile_shift(to_anec(nn)->tiles[bdx]));
+	tile = ane_zmemalign(tile_size(nn, bdx));
 	if (!tile) {
 		fprintf(stderr, "LIBANE: not enough mem to receive output\n");
 		return -ENOMEM;

@@ -37,7 +37,6 @@ struct ane_nn {
 	int dst_bdx[ANE_TILE_COUNT];
 };
 
-#define to_anec(nn)	 (&nn->model->anec)
 #define input_count(nn)	 (nn->model->input_count)
 #define output_count(nn) (nn->model->output_count)
 

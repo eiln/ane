@@ -3,6 +3,7 @@
 
 #include "ane_dev.h"
 #include "ane_mem.h"
+#include "ane_priv.h"
 
 #define FIFO_WIDTH 0x400 // nxtpow2(0x274)
 #define FIFO_COUNT 0x20
@@ -70,28 +71,26 @@ static int alloc_chans(struct ane_nn *nn)
 	if (!nn->fifo_chan)
 		goto error;
 
-	nn->chans[0] = ane_zmemalign(tile_shift(anec->tiles[0]));
+	nn->chans[0] = ane_zmemalign(tile_size(nn, 0));
 	if (!nn->chans[0])
 		goto error;
 
 	for (int i = 0; i < input_count(nn); i++) {
 		int bdx = nn->src_bdx[i];
-		uint64_t size = tile_shift(anec->tiles[bdx]);
-		nn->chans[bdx] = ane_zmemalign(size);
+		nn->chans[bdx] = ane_zmemalign(tile_size(nn, bdx));
 		if (!nn->chans[bdx])
 			goto error;
 		printf("LIBANE: allocated input chan %d/%d size 0x%lx\n", i + 1,
-		       input_count(nn), size);
+		       input_count(nn), tile_size(nn, bdx));
 	}
 
 	for (int i = 0; i < output_count(nn); i++) {
 		int bdx = nn->dst_bdx[i];
-		uint64_t size = tile_shift(anec->tiles[bdx]);
-		nn->chans[bdx] = ane_zmemalign(size);
+		nn->chans[bdx] = ane_zmemalign(tile_size(nn, bdx));
 		if (!nn->chans[bdx])
 			goto error;
 		printf("LIBANE: allocated output chan %d/%d size 0x%lx\n",
-		       i + 1, output_count(nn), size);
+		       i + 1, output_count(nn), tile_size(nn, bdx));
 	}
 
 	return 0;

@@ -7,12 +7,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define TILE_SHIFT    0xEUL
-#define TILE_SIZE     0x4000UL
-
-#define tile_shift(x) ((unsigned long)(x) << TILE_SHIFT)
-#define tile_align(x) (((unsigned long)(x) + TILE_SIZE - 1) & -TILE_SIZE)
-
 static inline void *ane_zmalloc(unsigned long size)
 {
 	void *data = malloc(size);
@@ -25,7 +19,7 @@ static inline void *ane_zmalloc(unsigned long size)
 static inline void *ane_memalign(unsigned long size)
 {
 	void *data;
-	if (posix_memalign(&data, TILE_SIZE, size))
+	if (posix_memalign(&data, 0x4000UL, size))
 		return NULL;
 	return data;
 }

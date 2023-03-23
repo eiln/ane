@@ -43,12 +43,13 @@ class Model:
 		self.src_count, self.dst_count = counts[0].value, counts[1].value
 		self.src_nchw = tuple([tuple(x.value for x in nchws[n*6:(n+1)*6]) for n in range(self.src_count)])
 		self.dst_nchw = tuple([tuple(x.value for x in nchws[n*6:(n+1)*6]) for n in range(TILE_COUNT, TILE_COUNT + self.dst_count)])
+		self.inputs_pad = [b''] * (TILE_COUNT - self.src_count)
 		self.outputs = [ctypes.create_string_buffer(align16k(nchw[0] * nchw[1] * nchw[4])) for nchw in self.dst_nchw] + [b''] * (TILE_COUNT - self.dst_count)
 
 	def predict(self, inarrs):  # list of numpy arrays
 		assert(len(inarrs) == self.src_count)
 		assert(all(((arr.dtype == np.float16) and (arr.shape == self.src_nchw[idx][:4])) for idx,arr in enumerate(inarrs)))
-		self.driver.lib.pyane_send(self.handle, *[arr.tobytes(order='C') for arr in inarrs], *[b''] * (TILE_COUNT - self.src_count))
+		self.driver.lib.pyane_send(self.handle, *[arr.tobytes(order='C') for arr in inarrs], *self.inputs_pad)
 		self.driver.lib.pyane_exec(self.handle)
 		self.driver.lib.pyane_read(self.handle, *self.outputs)
 		return [self.tile2arr(self.outputs[idx], idx) for idx in range(self.dst_count)]

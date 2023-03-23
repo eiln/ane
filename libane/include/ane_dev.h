@@ -7,7 +7,6 @@
 #include <asm/types.h>
 #include <errno.h>
 #include <stdint.h>
-#include <stdio.h>
 
 #include "drm_ane.h"
 

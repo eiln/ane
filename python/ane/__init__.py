@@ -10,7 +10,7 @@ import numpy as np
 from ctypes import c_void_p, c_ulong
 
 TILE_COUNT = 0x20
-def align16k(x): return (x + 0x4000 - 1) & -0x4000
+def tile_size(nchw): return ((nchw[0] * nchw[1] * nchw[4]) + 0x3fff) & -0x4000
 
 class Driver:
 	def __init__(self, path):
@@ -44,7 +44,7 @@ class Model:
 		self.src_nchw = tuple([tuple(x.value for x in nchws[n*6:(n+1)*6]) for n in range(self.src_count)])
 		self.dst_nchw = tuple([tuple(x.value for x in nchws[n*6:(n+1)*6]) for n in range(TILE_COUNT, TILE_COUNT + self.dst_count)])
 		self.inputs_pad = [b''] * (TILE_COUNT - self.src_count)
-		self.outputs = [ctypes.create_string_buffer(align16k(nchw[0] * nchw[1] * nchw[4])) for nchw in self.dst_nchw] + [b''] * (TILE_COUNT - self.dst_count)
+		self.outputs = [ctypes.create_string_buffer(tile_size(nchw)) for nchw in self.dst_nchw] + [b''] * (TILE_COUNT - self.dst_count)
 
 	def predict(self, inarrs):  # list of numpy arrays
 		assert(len(inarrs) == self.src_count)

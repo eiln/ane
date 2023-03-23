@@ -63,7 +63,7 @@ static inline void ane_untile(void *data, void *tile, const uint64_t N,
 	return;
 }
 
-int ane_tile_and_send(struct ane_nn *nn, void *from, const int idx)
+int ane_tiled_send(struct ane_nn *nn, void *from, const int idx)
 {
 	const struct ane_model *model = nn->model;
 	const int bdx = nn->src_bdx[idx];
@@ -88,7 +88,7 @@ int ane_tile_and_send(struct ane_nn *nn, void *from, const int idx)
 	return 0;
 }
 
-int ane_untile_and_read(struct ane_nn *nn, void *to, const int idx)
+int ane_tiled_read(struct ane_nn *nn, void *to, const int idx)
 {
 	const struct ane_model *model = nn->model;
 	const int bdx = nn->dst_bdx[idx];

@@ -36,7 +36,7 @@ int pyane_send(struct ane_nn *nn, void *x0, void *x1, void *x2, void *x3,
 				     x16, x17, x18, x19, x20, x21, x22, x23,
 				     x24, x25, x26, x27, x28, x29, x30, x31 };
 	for (int i = 0; i < input_count(nn); i++) {
-		ane_tile_and_send(nn, xs[i], i);
+		ane_tiled_send(nn, xs[i], i);
 	}
 	return 0;
 }

@@ -17,8 +17,8 @@ int ane_exec(struct ane_nn *nn);
 int ane_send(struct ane_nn *nn, void *from, const int idx);
 int ane_read(struct ane_nn *nn, void *to, const int idx);
 
-int ane_tile_and_send(struct ane_nn *nn, void *from, const int idx);
-int ane_untile_and_read(struct ane_nn *nn, void *to, const int idx);
+int ane_tiled_send(struct ane_nn *nn, void *from, const int idx);
+int ane_tiled_read(struct ane_nn *nn, void *to, const int idx);
 
 #if defined(__cplusplus)
 }

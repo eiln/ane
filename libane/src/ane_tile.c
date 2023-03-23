@@ -60,12 +60,12 @@ static inline void ane_untile(void *data, void *tile, const uint64_t N,
 
 int ane_tiled_send(struct ane_nn *nn, void *from, const int idx)
 {
-	const struct ane_model *model = nn->model;
-
-	if (src_idx_check(nn, idx))
+	if (idx >= input_count(nn))
 		return -EINVAL;
 
+	const struct ane_model *model = nn->model;
 	const int bdx = nn->src_bdx[idx];
+
 	uint16_t tile[tile_size(nn, bdx) / sizeof(uint16_t)];
 	memset(tile, 0, tile_size(nn, bdx));
 
@@ -79,12 +79,12 @@ int ane_tiled_send(struct ane_nn *nn, void *from, const int idx)
 
 int ane_tiled_read(struct ane_nn *nn, void *to, const int idx)
 {
-	const struct ane_model *model = nn->model;
-
-	if (dst_idx_check(nn, idx))
+	if (idx >= output_count(nn))
 		return -EINVAL;
 
+	const struct ane_model *model = nn->model;
 	const int bdx = nn->dst_bdx[idx];
+
 	uint16_t tile[tile_size(nn, bdx) / sizeof(uint16_t)];
 	// memset(tile, 0, tile_size(nn, bdx));
 

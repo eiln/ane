@@ -87,18 +87,18 @@ int ane_exec(struct ane_nn *nn)
 
 int ane_send(struct ane_nn *nn, void *from, const int idx)
 {
-	const int bdx = nn->src_bdx[idx];
-	if (src_idx_check(nn, idx))
+	if (idx >= input_count(nn))
 		return -EINVAL;
+	const int bdx = nn->src_bdx[idx];
 	memcpy(nn->chans[bdx], from, tile_size(nn, bdx));
 	return 0;
 }
 
 int ane_read(struct ane_nn *nn, void *to, const int idx)
 {
-	const int bdx = nn->dst_bdx[idx];
-	if (dst_idx_check(nn, idx))
+	if (idx >= output_count(nn))
 		return -EINVAL;
+	const int bdx = nn->dst_bdx[idx];
 	memcpy(to, nn->chans[bdx], tile_size(nn, bdx));
 	return 0;
 }

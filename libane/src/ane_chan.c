@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 /* Copyright 2022 Eileen Yoon <eyn@gmx.com> */
 
-#include "ane_dev.h"
 #include "ane_mem.h"
 #include "ane_priv.h"
 

@@ -6,7 +6,6 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-#include "ane_dev.h"
 #include "ane_priv.h"
 
 #define ANE_SYSFS_PATH "/dev/dri/renderD129"

@@ -1,7 +1,9 @@
 LIB_NAME = libane
 
 CC = gcc
-CFLAGS = -I. -Wall -Werror -Wextra -Wpedantic -O2
+CFLAGS = -I. -Wall -Werror -Wextra \
+	-Wdeclaration-after-statement \
+	-O2 -std=gnu99
 
 LIBS = -I/usr/include/libdrm \
 	-I/home/eileen/ane/ane/src/include \

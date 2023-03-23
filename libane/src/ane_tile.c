@@ -39,12 +39,12 @@ static inline void ane_untile(void *data, void *tile, const uint64_t N,
 	const uint64_t new_W = R / sizeof(uint16_t);
 	const uint64_t stride = W * sizeof(uint16_t);
 
-	const uint64_t data_size = N * C * H * W * sizeof(uint16_t);
-	memset(data, 0, data_size); // TODO; needed?
-
 	uint16_t(*data_a)[N][C][H][W] = (uint16_t(*)[N][C][H][W])data;
 	uint16_t(*tile_a)[N][C][new_H][new_W] =
 		(uint16_t(*)[N][C][new_H][new_W])tile;
+
+	const uint64_t data_size = N * C * H * W * sizeof(uint16_t);
+	memset(data, 0, data_size); // TODO; needed?
 
 	for (uint64_t n = 0; n < N; n++) { // TODO; early exit on alignment
 		for (uint64_t c = 0; c < C; c++) {
@@ -60,9 +60,6 @@ static inline void ane_untile(void *data, void *tile, const uint64_t N,
 
 int ane_tiled_send(struct ane_nn *nn, void *from, const int idx)
 {
-	if (idx >= input_count(nn))
-		return -EINVAL;
-
 	const struct ane_model *model = nn->model;
 	const int bdx = nn->src_bdx[idx];
 
@@ -79,9 +76,6 @@ int ane_tiled_send(struct ane_nn *nn, void *from, const int idx)
 
 int ane_tiled_read(struct ane_nn *nn, void *to, const int idx)
 {
-	if (idx >= output_count(nn))
-		return -EINVAL;
-
 	const struct ane_model *model = nn->model;
 	const int bdx = nn->dst_bdx[idx];
 

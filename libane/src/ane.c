@@ -89,8 +89,8 @@ int ane_send(struct ane_nn *nn, void *from, const int idx)
 {
 	if (idx >= input_count(nn))
 		return -EINVAL;
-	const int bdx = nn->src_bdx[idx];
-	memcpy(nn->chans[bdx], from, tile_size(nn, bdx));
+	memcpy(nn->chans[nn->src_bdx[idx]], from,
+	       tile_size(nn, nn->src_bdx[idx]));
 	return 0;
 }
 
@@ -98,7 +98,7 @@ int ane_read(struct ane_nn *nn, void *to, const int idx)
 {
 	if (idx >= output_count(nn))
 		return -EINVAL;
-	const int bdx = nn->dst_bdx[idx];
-	memcpy(to, nn->chans[bdx], tile_size(nn, bdx));
+	memcpy(to, nn->chans[nn->dst_bdx[idx]],
+	       tile_size(nn, nn->dst_bdx[idx]));
 	return 0;
 }

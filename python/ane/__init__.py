@@ -7,8 +7,7 @@ import os
 import atexit
 import ctypes
 import numpy as np
-from copy import copy
-from ctypes import c_void_p, c_ulong, byref, POINTER, create_string_buffer
+from ctypes import c_void_p, c_ulong, byref
 
 TILE_COUNT = 0x20
 def align16k(x): return (x + 0x4000 - 1) & -0x4000
@@ -21,7 +20,7 @@ class Driver:
 		self.lib.pyane_exec.argtypes = [c_void_p]
 		self.lib.pyane_send.argtypes = [c_void_p] + [c_void_p] * TILE_COUNT
 		self.lib.pyane_read.argtypes = [c_void_p] + [c_void_p] * TILE_COUNT
-		self.lib.pyane_info.argtypes = [c_void_p] + [POINTER(c_ulong)] * (2 + (6 * TILE_COUNT * 2))
+		self.lib.pyane_info.argtypes = [c_void_p] + [ctypes.POINTER(c_ulong)] * (2 + (6 * TILE_COUNT * 2))
 		self.handles = {}
 		atexit.register(self.cleanup)
 
@@ -46,21 +45,18 @@ class Model:
 		self.dst_nchw = tuple([tuple(x.value for x in nchws[n*6:(n+1)*6]) for n in range(TILE_COUNT, TILE_COUNT + self.dst_count)])
 		self.src_size = tuple([align16k(nchw[0] * nchw[1] * nchw[4]) for nchw in self.src_nchw])
 		self.dst_size = tuple([align16k(nchw[0] * nchw[1] * nchw[4]) for nchw in self.dst_nchw])
-		self.outputs = [create_string_buffer(size) for size in self.dst_size] + [b''] * (TILE_COUNT - self.dst_count)
+		self.outputs = [ctypes.create_string_buffer(size) for size in self.dst_size] + [b''] * (TILE_COUNT - self.dst_count)
 
-	def predict(self, inarrs): # list of numpy arrays
+	def predict(self, inarrs):  # list of numpy arrays
 		assert(all(((arr.dtype == np.float16) and (arr.shape == self.src_nchw[idx][:4])) for idx,arr in enumerate(inarrs)))
 		inputs = [arr.tobytes(order='C') for arr in inarrs]
 		self.driver.lib.pyane_send(self.handle, *inputs, *[b''] * (TILE_COUNT - self.src_count))
 		self.driver.lib.pyane_exec(self.handle)
 		self.driver.lib.pyane_read(self.handle, *self.outputs)
-		return copy(self.outputs[:self.dst_count])
+		return [self.tile2arr(self.outputs[idx], idx) for idx in range(self.dst_count)]
 
 	def tile2arr(self, tile, idx):
 		N, C, H, W, P, R = self.dst_nchw[idx]
 		new_N, new_C, new_H, new_W = N, C, P//R, R//2
 		arr = np.frombuffer(tile, dtype=np.float16)[:new_N*new_C*new_H*new_W]
 		return arr.reshape((new_N, new_C, new_H, new_W))[:N, :C, :H, :W]
-
-	def untile(self, outtiles):  # list of bytes tiles
-		return [self.tile2arr(outtiles[idx], idx) for idx in range(self.dst_count)]

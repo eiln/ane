@@ -15,7 +15,7 @@ OBJECTS = $(BUILD_DIR)/ane.o \
 	$(BUILD_DIR)/ane_drv.o \
 	$(BUILD_DIR)/ane_tile.o
 
-.PHONY: libane install
+.PHONY: libane install uninstall
 
 libane: $(OBJECTS)
 	ar cr $(BUILD_DIR)/${LIB_NAME}.a $(OBJECTS)
@@ -26,6 +26,9 @@ install: libane
 	install $(BUILD_DIR)/${LIB_NAME}.o ${DESTDIR}/usr/lib
 	mkdir -p ${DESTDIR}/usr/include/${LIB_NAME}
 	cp -r include/*.h ${DESTDIR}/usr/include/${LIB_NAME}
+
+uninstall:
+	rm -rf ${DESTDIR}/usr/include/${LIB_NAME}
 
 $(BUILD_DIR)/%.o : $(SRC_DIR)/%.c
 	@mkdir -p $(BUILD_DIR)

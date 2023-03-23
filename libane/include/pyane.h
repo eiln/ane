@@ -6,9 +6,12 @@
 
 #include "ane.h"
 
-void *pyane_init(void);
-int pyane_free(struct ane_nn *nn);
-int pyane_exec(struct ane_nn *nn);
+/* Void ptr wrappers around ane.h functions for Python.
+ * This really has no business being inside a header,
+ * just reduces complexity in the already-hacky anecc.
+ */
+
+void *pyane_init(void); /* Completed by anecc */
 
 int pyane_free(struct ane_nn *nn)
 {
@@ -22,7 +25,7 @@ int pyane_exec(struct ane_nn *nn)
 	return err;
 }
 
-// im sorry
+/* I've concluded this is the sanest way to handle (not) variadic args */
 
 int pyane_send(struct ane_nn *nn, void *x0, void *x1, void *x2, void *x3,
 	       void *x4, void *x5, void *x6, void *x7, void *x8, void *x9,
@@ -57,6 +60,8 @@ int pyane_read(struct ane_nn *nn, void *x0, void *x1, void *x2, void *x3,
 	}
 	return 0;
 }
+
+/* You thought that was bad? Hope you like memory layout */
 
 int pyane_info(struct ane_nn *nn, unsigned long *src_count,
 	       unsigned long *dst_count, unsigned long *x0, unsigned long *x1,

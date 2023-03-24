@@ -58,7 +58,7 @@ static inline void ane_untile(void *data, void *tile, const uint64_t N,
 	return;
 }
 
-int ane_tiled_send(struct ane_nn *nn, void *from, const int idx)
+int ane_send(struct ane_nn *nn, void *from, const int idx)
 {
 	const struct ane_model *model = nn->model;
 	const int bdx = nn->src_bdx[idx];
@@ -69,12 +69,12 @@ int ane_tiled_send(struct ane_nn *nn, void *from, const int idx)
 	ane_tile(from, tile, model->nchw[bdx][0], model->nchw[bdx][1],
 		 model->nchw[bdx][2], model->nchw[bdx][3], model->nchw[bdx][4],
 		 model->nchw[bdx][5]);
-	ane_send(nn, tile, idx);
+	ane_send_raw(nn, tile, idx);
 
 	return 0;
 }
 
-int ane_tiled_read(struct ane_nn *nn, void *to, const int idx)
+int ane_read(struct ane_nn *nn, void *to, const int idx)
 {
 	const struct ane_model *model = nn->model;
 	const int bdx = nn->dst_bdx[idx];
@@ -82,7 +82,7 @@ int ane_tiled_read(struct ane_nn *nn, void *to, const int idx)
 	uint16_t tile[tile_size(nn, bdx) / sizeof(uint16_t)];
 	// memset(tile, 0, tile_size(nn, bdx));
 
-	ane_read(nn, tile, idx);
+	ane_read_raw(nn, tile, idx);
 	ane_untile(to, tile, model->nchw[bdx][0], model->nchw[bdx][1],
 		   model->nchw[bdx][2], model->nchw[bdx][3],
 		   model->nchw[bdx][4], model->nchw[bdx][5]);

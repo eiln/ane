@@ -85,7 +85,7 @@ int ane_exec(struct ane_nn *nn)
 	return ane_drv_nn_exec(nn->ane, nn);
 }
 
-int ane_send(struct ane_nn *nn, void *from, const int idx)
+int ane_send_raw(struct ane_nn *nn, void *from, const int idx)
 {
 	if (idx >= input_count(nn))
 		return -EINVAL;
@@ -94,7 +94,7 @@ int ane_send(struct ane_nn *nn, void *from, const int idx)
 	return 0;
 }
 
-int ane_read(struct ane_nn *nn, void *to, const int idx)
+int ane_read_raw(struct ane_nn *nn, void *to, const int idx)
 {
 	if (idx >= output_count(nn))
 		return -EINVAL;

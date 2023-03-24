@@ -20,16 +20,16 @@ OBJECTS = $(BUILD_DIR)/ane.o \
 .PHONY: libane install uninstall
 
 libane: $(OBJECTS)
-	ar cr $(BUILD_DIR)/${LIB_NAME}.a $(OBJECTS)
 	ld -r $(OBJECTS) -o $(BUILD_DIR)/${LIB_NAME}.o
+	ar rcs $(BUILD_DIR)/${LIB_NAME}.a $(BUILD_DIR)/${LIB_NAME}.o
 
 install: libane
 	install $(BUILD_DIR)/${LIB_NAME}.a ${DESTDIR}/usr/lib
-	install $(BUILD_DIR)/${LIB_NAME}.o ${DESTDIR}/usr/lib
 	mkdir -p ${DESTDIR}/usr/include/${LIB_NAME}
 	cp -r include/*.h ${DESTDIR}/usr/include/${LIB_NAME}
 
 uninstall:
+	rm -f ${DESTDIR}/usr/lib/${LIB_NAME}.a
 	rm -rf ${DESTDIR}/usr/include/${LIB_NAME}
 
 $(BUILD_DIR)/%.o : $(SRC_DIR)/%.c

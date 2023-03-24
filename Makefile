@@ -1,12 +1,12 @@
-
-.PHONY: libane clean
+.PHONY: libane python clean
 
 default: libane
 libane:
 	make -C libane
+python: libane
+	make -C python install
 install:
 	make -C libane install
-	make -C python install
 
 clean:
 	rm -rf build

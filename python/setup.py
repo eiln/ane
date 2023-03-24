@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
 	name='ane',
-	version='1.0.4',
+	version='1.0.5',
 	description='ANE driver interface',
 	author='Eileen Yoon',
 	author_email='eyn@gmx.com',

@@ -1,27 +1,30 @@
 LIB_NAME = libane
 
 CC = gcc
-CFLAGS = -I. -Wall -Werror -Wextra \
+CFLAGS = -I. -I./include -Wall -Werror -Wextra \
 	-Wdeclaration-after-statement \
 	-O2 -std=gnu99
 
-LIBS = -I/usr/include/libdrm \
-	-I/home/eileen/ane/ane/src/include \
-	-I./include
+UAPI_PATH = -I/home/eileen/ane/ane/src/include
+LIBS = -I/usr/include/libdrm $(UAPI_PATH)
 
-BUILD_DIR = /home/eileen/ane/build
-SRC_DIR = ./src
+BUILD_DIR = build
+SRC_DIR = src
 
 OBJECTS = $(BUILD_DIR)/ane.o \
-	$(BUILD_DIR)/ane_chan.o \
-	$(BUILD_DIR)/ane_drv.o \
-	$(BUILD_DIR)/ane_tile.o
+	  $(BUILD_DIR)/ane_chan.o \
+	  $(BUILD_DIR)/ane_drv.o \
+	  $(BUILD_DIR)/ane_tile.o
 
-.PHONY: libane install uninstall
+.PHONY: libane install uninstall clean
 
 libane: $(OBJECTS)
 	ld -r $(OBJECTS) -o $(BUILD_DIR)/${LIB_NAME}.o
 	ar rcs $(BUILD_DIR)/${LIB_NAME}.a $(BUILD_DIR)/${LIB_NAME}.o
+
+$(BUILD_DIR)/%.o : $(SRC_DIR)/%.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(LIBS) -c $< -o $@
 
 install: libane
 	install $(BUILD_DIR)/${LIB_NAME}.a ${DESTDIR}/usr/lib
@@ -32,6 +35,5 @@ uninstall:
 	rm -f ${DESTDIR}/usr/lib/${LIB_NAME}.a
 	rm -rf ${DESTDIR}/usr/include/${LIB_NAME}
 
-$(BUILD_DIR)/%.o : $(SRC_DIR)/%.c
-	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(LIBS) -c $< -o $@
+clean:
+	rm -rf $(BUILD_DIR)

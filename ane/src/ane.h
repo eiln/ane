@@ -12,23 +12,23 @@ struct ane_device {
 	struct device *dev;
 	const struct ane_hw *hw;
 
-	struct device **pd_dev;
+	struct device **pd_dev; /* Engine/RPM power domains */
 	struct device_link **pd_link;
 	int pd_count;
 
-	void __iomem *engine;
-	void __iomem *dart1;
-	void __iomem *dart2;
+	void __iomem *engine; /* Engine MMIO range */
+	void __iomem *dart1; /* Auxiliary IOMMU range for DMA */
+	void __iomem *dart2; /* Auxiliary IOMMU range for DMA */
 
-	struct drm_mm mm;
+	struct drm_mm mm; /* IOMMU space allocator */
 	struct iommu_domain *domain;
-	unsigned long shift;
+	unsigned long shift; /* IOMMU shift */
 
 	int irq;
 	int dart_irq;
 
-	struct mutex iommu_lock;
-	struct mutex engine_lock;
+	struct mutex iommu_lock; /* Protects IOMMU space */
+	struct mutex engine_lock; /* Protects engine queue */
 };
 
 struct ane_hw {
@@ -40,17 +40,17 @@ struct ane_hw {
 	u32 die_ane_id;
 
 	struct {
-		u64 base;
-		u64 dart1;
-		u64 dart2;
+		u64 base; /* Main DART base address */
+		u64 dart1; /* Aux DART base address */
+		u64 dart2; /* Aux DART base address */
 		u64 dapf;
 		u64 vm_base;
 		u64 vm_size;
 		u32 page_size;
-		u32 ttbr;
-		u32 sel;
-		u32 cmd;
-		u32 inv;
+		u32 ttbr; /* TTBR offset */
+		u32 sel; /* Stream select offset */
+		u32 cmd; /* Stream command offset */
+		u32 inv; /* Stream command TLB invalidation bit */
 	} dart;
 };
 

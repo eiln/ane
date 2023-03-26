@@ -14,8 +14,8 @@
 
 	git clone https://github.com/eiln/ane.git
 	cd ane
-	make
-	make install
+	make -C libane
+	make -C libane install
 
 will install
 
@@ -148,7 +148,7 @@ Or
 
 	git clone https://github.com/eiln/ane.git
 	cd ane
-	make python
+	make install
 
 
 ### Dependencies

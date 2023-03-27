@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 /* Copyright 2022 Eileen Yoon <eyn@gmx.com> */
 
-#include "ane_mem.h"
+#include "ane_bo.h"
 #include "ane_priv.h"
 
 #define FIFO_WIDTH 0x400 // nxtpow2(0x274)
@@ -14,39 +14,39 @@ static inline void set_nid(void *td, int nid)
 	memcpy(td, &hdr0, sizeof(uint32_t));
 }
 
+// clang-format off
 static inline void load_anec(struct ane_nn *nn)
 {
 	const struct anec *anec = to_anec(nn);
 	const void *anec_data = nn->model->data;
 
-	memcpy(nn->chans[0], anec_data, anec->size);
+	memcpy(nn->chans[0]->map, anec_data, anec->size);
 
 	/* do not fucking overflow */
-	memcpy(nn->fifo_chan, anec_data, anec->td_size);
-	memcpy((char *)nn->fifo_chan + FIFO_WIDTH, anec_data, anec->td_size);
+	memcpy(nn->fifo_chan->map, anec_data, anec->td_size);
+	memcpy((char *)nn->fifo_chan->map + FIFO_WIDTH, anec_data, anec->td_size);
 
-	set_nid(nn->fifo_chan, ANE_FIFO_NID);
-	set_nid((char *)nn->fifo_chan + FIFO_WIDTH, ANE_FIFO_NID + FIFO_COUNT);
+	set_nid(nn->fifo_chan->map, ANE_FIFO_NID);
+	set_nid((char *)nn->fifo_chan->map + FIFO_WIDTH, ANE_FIFO_NID + FIFO_COUNT);
 }
+// clang-format on
 
-static void free_chans(struct ane_nn *nn)
+int ane_chan_free(struct ane_device *ane, struct ane_nn *nn)
 {
 	if (nn->fifo_chan) {
-		free(nn->fifo_chan);
-		nn->fifo_chan = NULL;
+		ane_bo_free(ane, nn->fifo_chan);
 	}
 
 	for (int bdx = 0; bdx < ANE_TILE_COUNT; bdx++) {
 		if (nn->chans[bdx]) {
-			free(nn->chans[bdx]);
-			nn->chans[bdx] = NULL;
+			ane_bo_free(ane, nn->chans[bdx]);
 		}
 	}
 
-	return;
+	return 0;
 }
 
-static int alloc_chans(struct ane_nn *nn)
+int ane_chan_init(struct ane_device *ane, struct ane_nn *nn)
 {
 	const struct anec *anec = to_anec(nn);
 
@@ -66,57 +66,26 @@ static int alloc_chans(struct ane_nn *nn)
 		return -EINVAL;
 	}
 
-	nn->fifo_chan = ane_zmemalign(tile_align(FIFO_WIDTH * 2));
+	for (int bdx = 0; bdx < ANE_TILE_COUNT; bdx++) {
+		if (anec->tiles[bdx]) {
+			struct ane_bo *bo = NULL;
+			bo = ane_bo_init(ane, tile_size(nn, bdx));
+			if (!bo)
+				goto error;
+			nn->chans[bdx] = bo;
+		}
+	}
+
+	nn->fifo_chan = ane_bo_init(ane, tile_align(FIFO_WIDTH * 2));
 	if (!nn->fifo_chan)
 		goto error;
 
-	nn->chans[0] = ane_zmemalign(tile_size(nn, 0));
-	if (!nn->chans[0])
-		goto error;
-
-	for (int i = 0; i < input_count(nn); i++) {
-		int bdx = nn->src_bdx[i];
-		nn->chans[bdx] = ane_zmemalign(tile_size(nn, bdx));
-		if (!nn->chans[bdx])
-			goto error;
-		printf("LIBANE: allocated input chan %d/%d size 0x%lx\n", i + 1,
-		       input_count(nn), tile_size(nn, bdx));
-	}
-
-	for (int i = 0; i < output_count(nn); i++) {
-		int bdx = nn->dst_bdx[i];
-		nn->chans[bdx] = ane_zmemalign(tile_size(nn, bdx));
-		if (!nn->chans[bdx])
-			goto error;
-		printf("LIBANE: allocated output chan %d/%d size 0x%lx\n",
-		       i + 1, output_count(nn), tile_size(nn, bdx));
-	}
+	load_anec(nn);
 
 	return 0;
 
 error:
 	fprintf(stderr, "LIBANE: out of memory for chans\n");
-	free_chans(nn);
+	ane_chan_free(ane, nn);
 	return -ENOMEM;
-}
-
-int ane_chan_init(struct ane_nn *nn)
-{
-	int err;
-
-	err = alloc_chans(nn);
-	if (err) {
-		fprintf(stderr, "LIBANE: failed to alloc chans, 0x%x\n", err);
-		return err;
-	}
-
-	load_anec(nn);
-
-	return 0;
-}
-
-int ane_chan_free(struct ane_nn *nn)
-{
-	free_chans(nn);
-	return 0;
 }

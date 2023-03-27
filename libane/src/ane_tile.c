@@ -2,7 +2,6 @@
 /* Copyright 2022 Eileen Yoon <eyn@gmx.com> */
 
 #include "ane.h"
-#include "ane_mem.h"
 #include "ane_priv.h"
 
 static inline void ane_tile(void *data, void *tile, const uint64_t N,

@@ -21,102 +21,15 @@
 #include "ane_tm.h"
 #include "include/drm_ane.h"
 
-/* device-continuous object */
-struct ane_node {
+struct ane_bo {
+	struct drm_gem_object base;
 	struct drm_mm_node *mm;
 	u32 npages;
 	struct page **pages;
 	dma_addr_t iova;
-	u64 userptr;
-	u32 type;
 };
 
-/* neural network */
-struct ane_nn {
-	struct drm_gem_object base;
-	struct ane_engine_req req;
-	struct anec anec;
-	struct ane_node tiles[ANE_TILE_COUNT];
-	struct ane_node fifo;
-	int tile_bdx[ANE_TILE_COUNT];
-	int tile_count;
-	int mapped;
-};
-
-#define to_anec(nn) (&nn->anec)
-
-static void ane_mm_free_pages(struct ane_node *node)
-{
-	if (!node->pages)
-		return;
-
-	for (u32 i = 0; i < node->npages && node->pages[i] != NULL; i++) {
-		__free_page(node->pages[i]);
-	}
-	kvfree(node->pages);
-}
-
-static int ane_mm_alloc_pages(struct ane_node *node)
-{
-	if (node->pages)
-		return -EBUSY;
-
-	node->pages =
-		kvmalloc_array(node->npages, sizeof(*node->pages), GFP_KERNEL);
-	if (!node->pages)
-		return -ENOMEM;
-
-	for (u32 i = 0; i < node->npages; i++) {
-		node->pages[i] = alloc_page(GFP_KERNEL);
-		if (node->pages[i] == NULL)
-			goto free_pages;
-	}
-
-	return 0;
-
-free_pages:
-	ane_mm_free_pages(node);
-	return -ENOMEM;
-}
-
-static void ane_mm_put_user_pages(struct ane_node *node)
-{
-	if (!node->pages)
-		return;
-
-	for (u32 i = 0; i < node->npages; i++) {
-		if (node->pages[i])
-			put_page(node->pages[i]);
-	}
-	kvfree(node->pages);
-}
-
-static int ane_mm_get_user_pages(struct ane_node *node)
-{
-	long pinned;
-
-	if (node->pages)
-		return -EBUSY;
-
-	if (!node->userptr)
-		return -EINVAL;
-
-	node->pages =
-		kvmalloc_array(node->npages, sizeof(struct page *), GFP_KERNEL);
-	if (!node->pages)
-		return -ENOMEM;
-
-	pinned = get_user_pages(node->userptr, node->npages, FOLL_WRITE,
-				node->pages, NULL);
-	if (pinned != node->npages) {
-		ane_mm_put_user_pages(node);
-		return -EFAULT;
-	}
-
-	return 0;
-}
-
-static int ane_iommu_map_pages(struct ane_device *ane, struct ane_node *node)
+static int ane_iommu_map_pages(struct ane_device *ane, struct ane_bo *node)
 {
 	int err;
 
@@ -168,7 +81,7 @@ unlock:
 	return err;
 }
 
-static void ane_iommu_unmap_pages(struct ane_device *ane, struct ane_node *node)
+static void ane_iommu_unmap_pages(struct ane_device *ane, struct ane_bo *node)
 {
 	if (!node->mm)
 		return;
@@ -210,135 +123,7 @@ static void ane_iommu_invalidate_tlb(struct ane_device *ane)
 	mutex_unlock(&ane->iommu_lock);
 }
 
-static int ane_nn_validate_anec(struct ane_device *ane, struct ane_nn *nn)
-{
-	struct anec *anec = to_anec(nn);
-	int i = 0;
-
-	/*
-	 * Checks in case the compiler output was messed with...
-	 */
-	if (!anec->size || !anec->tsk_size || !anec->krn_size ||
-	    !anec->td_size || !anec->td_count)
-		return -EINVAL;
-
-	if (anec->tsk_size < anec->td_size)
-		return -EINVAL;
-
-	if ((anec->td_size * 2) > 1UL << ane->shift)
-		return -EINVAL;
-
-	if (anec->size !=
-	    (roundup(anec->tsk_size, ANE_CMD_GRAN) + anec->krn_size))
-		return -EINVAL;
-
-	if (anec->td_count >= 0xffff)
-		return -EINVAL;
-
-	if (!anec->tiles[0] || anec->types[0] != ANE_TILE_CMD || anec->tiles[1])
-		return -EINVAL;
-
-	if (anec->tiles[2] && !anec->tiles[3])
-		return -EINVAL;
-
-	if (!anec->tiles[4] || !anec->tiles[5])
-		return -EINVAL;
-
-	for (int bdx = 0; bdx < ANE_TILE_COUNT; bdx++) {
-		if (anec->tiles[bdx])
-			nn->tile_bdx[i++] = bdx;
-
-		if (anec->tiles[bdx] && !anec->types[bdx])
-			return -EINVAL;
-
-		if (!anec->tiles[bdx] && anec->types[bdx])
-			return -EINVAL;
-
-		if (anec->tiles[bdx] > 0xffff)
-			return -EINVAL;
-
-		if (anec->tiles[bdx] && anec->types[bdx] != ANE_TILE_CMD &&
-		    anec->types[bdx] != ANE_TILE_ITM &&
-		    anec->types[bdx] != ANE_TILE_DST &&
-		    anec->types[bdx] != ANE_TILE_SRC)
-			return -EINVAL;
-	}
-
-	nn->tile_count = i;
-
-	return 0;
-}
-
-static const struct vm_operations_struct drm_gem_ane_vm_ops = {
-	.open = drm_gem_vm_open,
-	.close = drm_gem_vm_close,
-};
-
-static const struct drm_gem_object_funcs ane_gem_object_funcs = {
-	.vm_ops = &drm_gem_ane_vm_ops,
-};
-
-static int ane_nn_create(struct drm_device *drm, void *data,
-			 struct drm_file *file)
-{
-	struct ane_device *ane = drm->dev_private;
-	struct drm_ane_nn_create *args = data;
-	struct drm_gem_object *gem = NULL;
-	struct ane_nn *nn = NULL;
-	struct anec *anec = NULL;
-	int err;
-
-	if (args->pad)
-		return -EINVAL;
-
-	if (!(nn = kzalloc(sizeof(struct ane_nn), GFP_KERNEL)))
-		return -ENOMEM;
-
-	anec = to_anec(nn);
-	err = copy_from_user(anec, u64_to_user_ptr(args->anec_userptr),
-			     sizeof(struct anec));
-	if (err) {
-		dev_err(ane->dev, "failed to copy anec\n");
-		err = -EFAULT;
-		goto free_nn;
-	}
-
-	err = ane_nn_validate_anec(ane, nn);
-	if (err < 0) {
-		dev_err(ane->dev, "invalid anec setup\n");
-		goto free_nn;
-	}
-
-	nn->mapped = 0;
-	nn->req.nid = ANE_FIFO_NID;
-	nn->req.td_size = anec->td_size;
-	nn->req.td_count = anec->td_count;
-
-	pr_info("received nn with size: 0x%llx td_count: 0x%x\n", anec->size,
-		nn->req.td_count);
-
-	/* fake mini gem backing for the sake of a handle */
-	gem = &nn->base;
-	gem->funcs = &ane_gem_object_funcs;
-	err = drm_gem_object_init(drm, gem, PAGE_SIZE);
-	if (err < 0)
-		goto free_nn;
-
-	err = drm_gem_handle_create(file, gem, &args->handle);
-	drm_gem_object_put(gem); /* handle holds it now */
-	if (err < 0)
-		goto release;
-
-	return 0;
-
-release:
-	drm_gem_object_release(gem);
-free_nn:
-	kfree(nn);
-	return err;
-}
-
-static struct ane_nn *ane_nn_lookup(struct drm_file *file, u32 handle)
+static struct ane_bo *ane_bo_lookup(struct drm_file *file, u32 handle)
 {
 	struct drm_gem_object *gem;
 
@@ -346,115 +131,131 @@ static struct ane_nn *ane_nn_lookup(struct drm_file *file, u32 handle)
 	if (!gem)
 		return NULL;
 
-	return container_of(gem, struct ane_nn, base);
+	return container_of(gem, struct ane_bo, base);
 }
 
-static int ane_nn_free(struct drm_device *drm, void *data,
+static vm_fault_t ane_gem_vm_fault(struct vm_fault *vmf)
+{
+	struct vm_area_struct *vma = vmf->vma;
+	struct drm_gem_object *gem = vma->vm_private_data;
+	struct ane_bo *bo = container_of(gem, struct ane_bo, base);
+	struct page *page;
+	pgoff_t offset;
+
+	if (!bo->pages)
+		return VM_FAULT_SIGBUS;
+
+	offset = (vmf->address - vma->vm_start) >> PAGE_SHIFT;
+	page = bo->pages[offset];
+
+	return vmf_insert_page(vma, vmf->address, page);
+}
+
+static const struct vm_operations_struct drm_gem_ane_vm_ops = {
+	.open = drm_gem_vm_open,
+	.close = drm_gem_vm_close,
+	.fault = ane_gem_vm_fault,
+};
+
+static const struct drm_gem_object_funcs ane_gem_object_funcs = {
+	.vm_ops = &drm_gem_ane_vm_ops,
+};
+
+static int ane_bo_init(struct drm_device *drm, void *data,
 		       struct drm_file *file)
 {
-	struct drm_ane_nn_free *args = data;
-
-	struct ane_nn *nn = ane_nn_lookup(file, args->handle);
-	if (args->pad || !nn)
-		return -EINVAL;
-
-	WARN_ON(nn->mapped);
-	pr_info("freeing nn with size: 0x%llx td_count: 0x%x\n",
-		to_anec(nn)->size, nn->req.td_count);
-
-	drm_gem_handle_delete(file, args->handle);
-	drm_gem_object_release(&nn->base);
-
-	kfree(nn);
-	return 0;
-}
-
-static void __ane_nn_unmap(struct ane_device *ane, struct ane_nn *nn)
-{
-	WARN_ON(!nn->mapped);
-
-	for (int i = 0; i < nn->tile_count; i++) {
-		int bdx = nn->tile_bdx[i];
-		struct ane_node *tile = &nn->tiles[bdx];
-
-		ane_iommu_unmap_pages(ane, tile);
-
-		if (tile->type == ANE_TILE_ITM) {
-			ane_mm_free_pages(tile);
-		} else {
-			ane_mm_put_user_pages(tile);
-		}
-	}
-
-	ane_iommu_unmap_pages(ane, &nn->fifo);
-	ane_mm_put_user_pages(&nn->fifo);
-
-	/* macos invalidates on a per-network basis */
-	ane_iommu_invalidate_tlb(ane);
-
-	nn->mapped = 0;
-}
-
-static int ane_nn_unmap(struct drm_device *drm, void *data,
-			struct drm_file *file)
-{
 	struct ane_device *ane = drm->dev_private;
-	struct drm_ane_nn_unmap *args = data;
-	struct ane_nn *nn = ane_nn_lookup(file, args->handle);
-	if (args->pad || !nn)
-		return -EINVAL;
-	__ane_nn_unmap(ane, nn);
-	return 0;
-}
-
-static int ane_nn_map(struct drm_device *drm, void *data, struct drm_file *file)
-{
-	struct ane_device *ane = drm->dev_private;
-	struct drm_ane_nn_map *args = data;
+	struct drm_ane_bo_init *args = data;
+	struct drm_gem_object *gem = NULL;
+	struct ane_bo *bo = NULL;
 	int err;
 
-	struct anec *anec = NULL;
-	struct ane_nn *nn = ane_nn_lookup(file, args->handle);
-	if (args->pad || !nn)
+	if (args->pad)
 		return -EINVAL;
 
-	if (nn->mapped)
-		return 0;
+	bo = kzalloc(sizeof(struct ane_bo), GFP_KERNEL);
+	if (!bo)
+		return -ENOMEM;
 
-	anec = to_anec(nn);
+	gem = &bo->base;
+	gem->funcs = &ane_gem_object_funcs;
+	err = drm_gem_object_init(drm, gem, round_up(args->size, PAGE_SIZE));
+	if (err < 0)
+		goto free;
 
-	for (int i = 0; i < nn->tile_count; i++) {
-		int bdx = nn->tile_bdx[i];
-		struct ane_node *tile = &nn->tiles[bdx];
+	err = drm_gem_create_mmap_offset(gem);
+	if (err < 0)
+		goto release;
 
-		tile->npages = anec->tiles[bdx];
-		tile->type = anec->types[bdx];
-		tile->userptr = args->tile_userptr[bdx];
+	args->offset = drm_vma_node_offset_addr(&gem->vma_node);
 
-		/*
-		 * Intermediate buffers are just swap space the engine
-		 * demands when an operation exceeds L2. They're not BERT
-		 * intermediate layers, users don't need them whatsoever.
-		 * Back with alloc_page() & keep it in here.
-		 */
-		if (tile->type == ANE_TILE_ITM) {
-			err = ane_mm_alloc_pages(tile);
-		} else {
-			err = ane_mm_get_user_pages(tile);
+	// 4k ur on your own
+	bo->npages = gem->size >> PAGE_SHIFT;
+	bo->pages = drm_gem_get_pages(gem);
+	if (IS_ERR(bo->pages)) {
+		err = PTR_ERR(bo->pages);
+		goto release;
+	}
+
+	err = ane_iommu_map_pages(ane, bo);
+	if (err < 0)
+		goto put;
+
+	err = drm_gem_handle_create(file, gem, &args->handle);
+	drm_gem_object_put(gem); /* handle holds it now */
+	if (err < 0)
+		goto unmap;
+
+	return 0;
+
+unmap:
+	ane_iommu_unmap_pages(ane, bo);
+put:
+	drm_gem_put_pages(&bo->base, bo->pages, false, false);
+release:
+	drm_gem_object_release(gem);
+free:
+	kfree(bo);
+	return err;
+}
+
+static int ane_bo_free(struct drm_device *drm, void *data,
+		       struct drm_file *file)
+{
+	struct ane_device *ane = drm->dev_private;
+	struct drm_ane_bo_free *args = data;
+	struct ane_bo *bo = ane_bo_lookup(file, args->handle);
+	if (args->pad || !bo)
+		return -EINVAL;
+	ane_iommu_unmap_pages(ane, bo);
+	drm_gem_put_pages(&bo->base, bo->pages, true, true);
+	drm_gem_handle_delete(file, args->handle);
+	drm_gem_object_release(&bo->base);
+	kfree(bo);
+	return 0;
+}
+
+static int ane_submit(struct drm_device *drm, void *data, struct drm_file *file)
+{
+	struct ane_device *ane = drm->dev_private;
+	struct drm_ane_submit *args = data;
+	struct ane_bo *bo = NULL;
+	int err;
+
+	struct ane_engine_req req;
+	memset(&req, 0, sizeof(struct ane_engine_req));
+
+	req.nid = ANE_FIFO_NID;
+	req.td_size = args->td_size;
+	req.td_count = args->td_count;
+
+	for (int bdx = 0; bdx < ANE_TILE_COUNT; bdx++) {
+		if (args->tile_handle[bdx]) {
+			bo = ane_bo_lookup(file, args->tile_handle[bdx]);
+			if (bo) {
+				req.bar[bdx] = lower_32_bits(bo->iova);
+			}
 		}
-
-		if (err < 0) {
-			dev_err(ane->dev, "failed to obtain backing pages\n");
-			goto error;
-		}
-
-		err = ane_iommu_map_pages(ane, tile);
-		if (err < 0) {
-			dev_err(ane->dev, "failed to map pages to device\n");
-			goto error;
-		}
-
-		nn->req.bar[bdx] = lower_32_bits(tile->iova);
 	}
 
 	/*
@@ -465,7 +266,7 @@ static int ane_nn_map(struct drm_device *drm, void *data, struct drm_file *file)
 	 * buffer to worry about. We thus unpack the iova at which the
 	 * kernel *should* start.
 	 */
-	nn->req.bar[1] = nn->req.bar[0] + roundup(anec->tsk_size, ANE_CMD_GRAN);
+	req.bar[1] = req.bar[0] + roundup(args->tsk_size, ANE_CMD_GRAN);
 
 	/*
 	 * Technically the firmware maintains a pool of fifo buffers
@@ -475,58 +276,19 @@ static int ane_nn_map(struct drm_device *drm, void *data, struct drm_file *file)
 	 * is needed to execute the (first) network. We could make this
 	 * mini per-network pool here but we can also get it from userspace.
 	 */
-	nn->fifo.npages = 1;
-	nn->fifo.userptr = args->fifo_userptr;
-	err = ane_mm_get_user_pages(&nn->fifo);
-	if (err < 0) {
-		dev_err(ane->dev, "failed to obtain backing pages\n");
-		goto error;
-	}
-
-	err = ane_iommu_map_pages(ane, &nn->fifo);
-	if (err < 0) {
-		dev_err(ane->dev, "failed to map pages to device\n");
-		goto error;
-	}
-
-	nn->req.fifo_addr = lower_32_bits(nn->fifo.iova);
-
-	for (int i = 0; i < ANE_TILE_COUNT; i++) {
-		if (nn->req.bar[i]) {
-			pr_info("BAR %d: 0x%08x\n", i, nn->req.bar[i]);
-		}
-	}
-
-	nn->mapped = 1;
-
-	return 0;
-
-error:
-	__ane_nn_unmap(ane, nn);
-	return err;
-}
-
-static int ane_nn_exec(struct drm_device *drm, void *data,
-		       struct drm_file *file)
-{
-	struct ane_device *ane = drm->dev_private;
-	struct drm_ane_nn_exec *args = data;
-	int err;
-
-	struct ane_nn *nn = ane_nn_lookup(file, args->handle);
-	if (args->pad || !nn)
+	bo = ane_bo_lookup(file, args->fifo_handle);
+	if (!bo)
 		return -EINVAL;
+	req.fifo_addr = lower_32_bits(bo->iova);
 
-	if (!nn->mapped)
-		return -EINVAL;
-
+	// go go!
 	mutex_lock(&ane->engine_lock);
 
-	err = ane_tm_enqueue(ane, &nn->req);
+	err = ane_tm_enqueue(ane, &req);
 	if (err < 0)
 		goto error;
 
-	err = ane_tm_execute(ane, &nn->req);
+	err = ane_tm_execute(ane, &req);
 	if (err < 0)
 		goto error;
 
@@ -540,11 +302,9 @@ error:
 }
 
 static const struct drm_ioctl_desc ane_drm_ioctls[] = {
-	DRM_IOCTL_DEF_DRV(ANE_NN_CREATE, ane_nn_create, DRM_RENDER_ALLOW),
-	DRM_IOCTL_DEF_DRV(ANE_NN_FREE, ane_nn_free, DRM_RENDER_ALLOW),
-	DRM_IOCTL_DEF_DRV(ANE_NN_MAP, ane_nn_map, DRM_RENDER_ALLOW),
-	DRM_IOCTL_DEF_DRV(ANE_NN_UNMAP, ane_nn_unmap, DRM_RENDER_ALLOW),
-	DRM_IOCTL_DEF_DRV(ANE_NN_EXEC, ane_nn_exec, DRM_RENDER_ALLOW),
+	DRM_IOCTL_DEF_DRV(ANE_BO_INIT, ane_bo_init, DRM_RENDER_ALLOW),
+	DRM_IOCTL_DEF_DRV(ANE_BO_FREE, ane_bo_free, DRM_RENDER_ALLOW),
+	DRM_IOCTL_DEF_DRV(ANE_SUBMIT, ane_submit, DRM_RENDER_ALLOW),
 };
 
 static int ane_drm_open(struct drm_device *drm, struct drm_file *file)
@@ -596,12 +356,46 @@ static long ane_drm_unlocked_ioctl(struct file *file, unsigned int cmd,
 	return err;
 }
 
+static int ane_drm_mmap(struct file *file, struct vm_area_struct *vma)
+{
+	struct drm_gem_object *gem = NULL;
+	struct ane_bo *bo = NULL;
+	int err;
+
+	err = drm_gem_mmap(file, vma);
+	if (err < 0)
+		return err;
+
+	/*
+	 * Set vm_pgoff (used as a fake buffer offset by DRM) to 0 and map the
+	 * whole buffer from the start.
+	 */
+	vma->vm_pgoff = 0;
+	gem = vma->vm_private_data;
+	bo = container_of(gem, struct ane_bo, base);
+
+	/*
+	 * We allocated a struct page table for rk_obj, so clear
+	 * VM_PFNMAP flag that was set by drm_gem_mmap_obj()/drm_gem_mmap().
+	 */
+	vma->vm_flags |= VM_IO | VM_DONTEXPAND | VM_DONTDUMP;
+	vma->vm_flags &= ~VM_PFNMAP;
+
+	vma->vm_page_prot =
+		pgprot_writecombine(vm_get_page_prot(vma->vm_flags));
+	vma->vm_page_prot = pgprot_decrypted(vma->vm_page_prot);
+
+	if (vma_pages(vma) == 0)
+		return -ENXIO;
+	return vm_map_pages(vma, bo->pages, bo->npages);
+}
+
 static const struct file_operations ane_drm_fops = {
 	.owner = THIS_MODULE,
 	.open = drm_open, // accel_open
 	.release = drm_release,
 	.unlocked_ioctl = ane_drm_unlocked_ioctl,
-	.mmap = drm_gem_mmap,
+	.mmap = ane_drm_mmap,
 	.poll = drm_poll,
 	.read = drm_read,
 	.llseek = noop_llseek,

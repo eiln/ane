@@ -9,11 +9,33 @@
 
 #include "drm_ane.h"
 
+#define ANE_TILE_CMD 0x1
+#define ANE_TILE_ITM 0x2
+#define ANE_TILE_DST 0x3
+#define ANE_TILE_SRC 0x4
+
+struct anec {
+	__u64 size;
+	__u64 tsk_size;
+	__u64 krn_size;
+	__u32 td_count;
+	__u32 td_size;
+	__u32 tiles[ANE_TILE_COUNT];
+	__u32 types[ANE_TILE_COUNT];
+};
+
 struct ane_device {
 	int fd;
 	int ane_type;
 	int ane_subtype;
 	int ane_id;
+};
+
+struct ane_bo {
+	void *map;
+	uint64_t size;
+	uint32_t handle;
+	uint64_t offset;
 };
 
 struct ane_model {
@@ -29,8 +51,8 @@ struct ane_nn {
 	struct ane_device *ane;
 	const struct ane_model *model;
 	uint32_t handle;
-	void *chans[ANE_TILE_COUNT];
-	void *fifo_chan;
+	struct ane_bo *chans[ANE_TILE_COUNT];
+	struct ane_bo *fifo_chan;
 	int src_bdx[ANE_TILE_COUNT];
 	int dst_bdx[ANE_TILE_COUNT];
 };

@@ -14,7 +14,6 @@ static inline void set_nid(void *td, int nid)
 	memcpy(td, &hdr0, sizeof(uint32_t));
 }
 
-// clang-format off
 static inline void load_anec(struct ane_nn *nn)
 {
 	const struct anec *anec = to_anec(nn);
@@ -24,12 +23,11 @@ static inline void load_anec(struct ane_nn *nn)
 
 	/* do not fucking overflow */
 	memcpy(nn->fifo_chan->map, anec_data, anec->td_size);
-	memcpy((char *)nn->fifo_chan->map + FIFO_WIDTH, anec_data, anec->td_size);
+	memcpy(nn->fifo_chan->map + FIFO_WIDTH, anec_data, anec->td_size);
 
 	set_nid(nn->fifo_chan->map, ANE_FIFO_NID);
-	set_nid((char *)nn->fifo_chan->map + FIFO_WIDTH, ANE_FIFO_NID + FIFO_COUNT);
+	set_nid(nn->fifo_chan->map + FIFO_WIDTH, ANE_FIFO_NID + FIFO_COUNT);
 }
-// clang-format on
 
 int ane_chan_free(struct ane_device *ane, struct ane_nn *nn)
 {

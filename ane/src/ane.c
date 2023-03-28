@@ -191,7 +191,6 @@ static int ane_bo_init(struct drm_device *drm, void *data,
 
 	args->offset = drm_vma_node_offset_addr(&gem->vma_node);
 
-	// 4k ur on your own
 	bo->npages = gem->size >> PAGE_SHIFT;
 	bo->pages = drm_gem_get_pages(gem);
 	if (IS_ERR(bo->pages)) {
@@ -441,7 +440,6 @@ static void ane_iommu_domain_free(struct ane_device *ane)
 
 static int ane_iommu_domain_init(struct ane_device *ane)
 {
-	unsigned long order, iommu_page_size;
 	dma_addr_t min_iova, max_iova;
 	int err;
 
@@ -450,15 +448,7 @@ static int ane_iommu_domain_init(struct ane_device *ane)
 		return -EPROBE_DEFER;
 
 	ane->domain = domain;
-
-	/* ANE objects must be 16K */
-	order = __ffs(ane->domain->pgsize_bitmap);
-	iommu_page_size = 1UL << order; // 16K
-	if (iommu_page_size != ane->hw->dart.page_size) {
-		dev_err(ane->dev, "invalid iommu page size\n");
-		return -EINVAL;
-	}
-	ane->shift = order;
+	ane->shift = __ffs(ane->domain->pgsize_bitmap);
 
 	err = ane_remap_ttbr(ane);
 	if (err < 0)
@@ -469,7 +459,7 @@ static int ane_iommu_domain_init(struct ane_device *ane)
 	min_iova = ane->hw->dart.vm_base;
 
 	/* a page before as to not reach real limit */
-	max_iova = min_iova + ane->hw->dart.vm_size - iommu_page_size;
+	max_iova = min_iova + ane->hw->dart.vm_size - (1UL << ane->shift);
 
 	drm_mm_init(&ane->mm, min_iova, max_iova);
 

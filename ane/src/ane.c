@@ -417,30 +417,21 @@ static const struct drm_driver ane_drm_driver = {
 	.minor = 0,
 };
 
-static int ane_iommu_remap_ttbr(struct ane_device *ane)
+static int ane_remap_ttbr(struct ane_device *ane)
 {
-	int err = 0;
-	u32 ttbr;
+	void __iomem *reg;
 
-	void __iomem *ttbr_reg =
-		ioremap(ane->hw->dart.base + ane->hw->dart.ttbr, sizeof(u32));
-	if (IS_ERR(ttbr_reg))
-		return PTR_ERR(ttbr_reg);
+	reg = ioremap(ane->hw->dart.base + ane->hw->dart.ttbr, sizeof(u32));
+	if (IS_ERR(reg))
+		return PTR_ERR(reg);
 
-	ttbr = readl_relaxed(ttbr_reg);
-	if (!ttbr) {
-		dev_err(ane->dev, "base dart not initialized\n");
-		err = -EPROBE_DEFER;
-		goto unmap;
-	}
+	/* L2 DMA transfers fail without */
+	writel_relaxed(readl_relaxed(reg), ane->dart1 + ane->hw->dart.ttbr);
+	writel_relaxed(readl_relaxed(reg), ane->dart2 + ane->hw->dart.ttbr);
 
-	/* remap ttbr so DMA chans can do their thing */
-	writel_relaxed(ttbr, ane->dart1 + ane->hw->dart.ttbr);
-	writel_relaxed(ttbr, ane->dart2 + ane->hw->dart.ttbr);
+	iounmap(reg);
 
-unmap:
-	iounmap(ttbr_reg);
-	return err;
+	return 0;
 }
 
 static void ane_iommu_domain_free(struct ane_device *ane)
@@ -469,7 +460,7 @@ static int ane_iommu_domain_init(struct ane_device *ane)
 	}
 	ane->shift = order;
 
-	err = ane_iommu_remap_ttbr(ane);
+	err = ane_remap_ttbr(ane);
 	if (err < 0)
 		return err;
 

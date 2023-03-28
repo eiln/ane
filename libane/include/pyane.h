@@ -34,10 +34,10 @@ int pyane_send(struct ane_nn *nn, void *x0, void *x1, void *x2, void *x3,
 	       void *x22, void *x23, void *x24, void *x25, void *x26, void *x27,
 	       void *x28, void *x29, void *x30, void *x31)
 {
-	void *xs[ANE_TILE_COUNT] = { x0,  x1,  x2,  x3,	 x4,  x5,  x6,	x7,
-				     x8,  x9,  x10, x11, x12, x13, x14, x15,
-				     x16, x17, x18, x19, x20, x21, x22, x23,
-				     x24, x25, x26, x27, x28, x29, x30, x31 };
+	void *xs[TILE_COUNT] = { x0,  x1,  x2,	x3,  x4,  x5,  x6,  x7,
+				 x8,  x9,  x10, x11, x12, x13, x14, x15,
+				 x16, x17, x18, x19, x20, x21, x22, x23,
+				 x24, x25, x26, x27, x28, x29, x30, x31 };
 	for (int i = 0; i < input_count(nn); i++) {
 		ane_send(nn, xs[i], i);
 	}
@@ -51,10 +51,10 @@ int pyane_read(struct ane_nn *nn, void *x0, void *x1, void *x2, void *x3,
 	       void *x22, void *x23, void *x24, void *x25, void *x26, void *x27,
 	       void *x28, void *x29, void *x30, void *x31)
 {
-	void *xs[ANE_TILE_COUNT] = { x0,  x1,  x2,  x3,	 x4,  x5,  x6,	x7,
-				     x8,  x9,  x10, x11, x12, x13, x14, x15,
-				     x16, x17, x18, x19, x20, x21, x22, x23,
-				     x24, x25, x26, x27, x28, x29, x30, x31 };
+	void *xs[TILE_COUNT] = { x0,  x1,  x2,	x3,  x4,  x5,  x6,  x7,
+				 x8,  x9,  x10, x11, x12, x13, x14, x15,
+				 x16, x17, x18, x19, x20, x21, x22, x23,
+				 x24, x25, x26, x27, x28, x29, x30, x31 };
 	for (int i = 0; i < output_count(nn); i++) {
 		ane_read_raw(nn, xs[i], i);
 	}
@@ -194,7 +194,7 @@ int pyane_info(struct ane_nn *nn, unsigned long *src_count,
 	       unsigned long *x380, unsigned long *x381, unsigned long *x382,
 	       unsigned long *x383)
 {
-	unsigned long *is[ANE_TILE_COUNT * 6] = {
+	unsigned long *is[TILE_COUNT * 6] = {
 		x0,   x1,   x2,	  x3,	x4,   x5,   x6,	  x7,	x8,   x9,
 		x10,  x11,  x12,  x13,	x14,  x15,  x16,  x17,	x18,  x19,
 		x20,  x21,  x22,  x23,	x24,  x25,  x26,  x27,	x28,  x29,
@@ -216,7 +216,7 @@ int pyane_info(struct ane_nn *nn, unsigned long *src_count,
 		x180, x181, x182, x183, x184, x185, x186, x187, x188, x189,
 		x190, x191
 	};
-	unsigned long *os[ANE_TILE_COUNT * 6] = {
+	unsigned long *os[TILE_COUNT * 6] = {
 		x192, x193, x194, x195, x196, x197, x198, x199, x200, x201,
 		x202, x203, x204, x205, x206, x207, x208, x209, x210, x211,
 		x212, x213, x214, x215, x216, x217, x218, x219, x220, x221,

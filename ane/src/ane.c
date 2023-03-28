@@ -29,6 +29,8 @@ struct ane_bo {
 	dma_addr_t iova;
 };
 
+#define to_bo(gem) (container_of(gem, struct ane_bo, base))
+
 static int ane_iommu_map_pages(struct ane_device *ane, struct ane_bo *node)
 {
 	int err;
@@ -131,14 +133,14 @@ static struct ane_bo *ane_bo_lookup(struct drm_file *file, u32 handle)
 	if (!gem)
 		return NULL;
 
-	return container_of(gem, struct ane_bo, base);
+	return to_bo(gem);
 }
 
 static vm_fault_t ane_gem_vm_fault(struct vm_fault *vmf)
 {
 	struct vm_area_struct *vma = vmf->vma;
 	struct drm_gem_object *gem = vma->vm_private_data;
-	struct ane_bo *bo = container_of(gem, struct ane_bo, base);
+	struct ane_bo *bo = to_bo(gem);
 	struct page *page;
 	pgoff_t offset;
 
@@ -372,7 +374,7 @@ static int ane_drm_mmap(struct file *file, struct vm_area_struct *vma)
 	 */
 	vma->vm_pgoff = 0;
 	gem = vma->vm_private_data;
-	bo = container_of(gem, struct ane_bo, base);
+	bo = to_bo(gem);
 
 	/*
 	 * We allocated a struct page table for rk_obj, so clear

@@ -252,8 +252,8 @@ static int ane_submit(struct drm_device *drm, void *data, struct drm_file *file)
 	req.td_count = args->td_count;
 
 	for (int bdx = 0; bdx < ANE_TILE_COUNT; bdx++) {
-		if (args->tile_handle[bdx]) {
-			bo = ane_bo_lookup(file, args->tile_handle[bdx]);
+		if (args->handles[bdx]) {
+			bo = ane_bo_lookup(file, args->handles[bdx]);
 			if (bo) {
 				req.bar[bdx] = lower_32_bits(bo->iova);
 			}

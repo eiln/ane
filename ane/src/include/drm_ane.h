@@ -33,8 +33,7 @@ struct drm_ane_submit {
 	__u64 tsk_size;
 	__u32 td_count;
 	__u32 td_size;
-
-	__u32 tile_handle[ANE_TILE_COUNT];
+	__u32 handles[ANE_TILE_COUNT];
 	__u32 fifo_handle;
 };
 

@@ -87,7 +87,7 @@ int ane_exec(struct ane_nn *nn)
 
 	for (int bdx = 0; bdx < ANE_TILE_COUNT; bdx++) {
 		if (nn->chans[bdx]) {
-			args.tile_handle[bdx] = nn->chans[bdx]->handle;
+			args.handles[bdx] = nn->chans[bdx]->handle;
 		}
 	}
 	args.fifo_handle = nn->fifo_chan->handle;

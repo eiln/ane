@@ -637,22 +637,10 @@ static int __maybe_unused ane_runtime_resume(struct device *dev)
 	return 0;
 }
 
-static int __maybe_unused ane_pm_suspend(struct device *dev)
-{
-	struct ane_device *ane = dev_get_drvdata(dev);
-	return pm_runtime_force_suspend(ane->dev);
-}
-
-static int __maybe_unused ane_pm_resume(struct device *dev)
-{
-	struct ane_device *ane = dev_get_drvdata(dev);
-	return pm_runtime_force_resume(ane->dev);
-}
-
 // clang-format off
 static const struct dev_pm_ops ane_pm_ops = {
 	SET_RUNTIME_PM_OPS(ane_runtime_suspend, ane_runtime_resume, NULL)
-	SET_SYSTEM_SLEEP_PM_OPS(ane_pm_suspend, ane_pm_resume)
+	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend, pm_runtime_force_resume)
 };
 // clang-format on
 

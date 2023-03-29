@@ -38,7 +38,7 @@ int pyane_send(struct ane_nn *nn, void *x0, void *x1, void *x2, void *x3,
 				 x8,  x9,  x10, x11, x12, x13, x14, x15,
 				 x16, x17, x18, x19, x20, x21, x22, x23,
 				 x24, x25, x26, x27, x28, x29, x30, x31 };
-	for (int i = 0; i < input_count(nn); i++) {
+	for (int i = 0; i < nn->model->input_count; i++) {
 		ane_send(nn, xs[i], i);
 	}
 	return 0;
@@ -55,7 +55,7 @@ int pyane_read(struct ane_nn *nn, void *x0, void *x1, void *x2, void *x3,
 				 x8,  x9,  x10, x11, x12, x13, x14, x15,
 				 x16, x17, x18, x19, x20, x21, x22, x23,
 				 x24, x25, x26, x27, x28, x29, x30, x31 };
-	for (int i = 0; i < output_count(nn); i++) {
+	for (int i = 0; i < nn->model->output_count; i++) {
 		ane_read_raw(nn, xs[i], i);
 	}
 	return 0;
@@ -238,15 +238,15 @@ int pyane_info(struct ane_nn *nn, unsigned long *src_count,
 		x372, x373, x374, x375, x376, x377, x378, x379, x380, x381,
 		x382, x383
 	};
-	*src_count = input_count(nn);
-	*dst_count = output_count(nn);
-	for (int i = 0; i < input_count(nn); i++) {
+	*src_count = nn->model->input_count;
+	*dst_count = nn->model->output_count;
+	for (int i = 0; i < nn->model->input_count; i++) {
 		int bdx = nn->src_bdx[i];
 		for (int j = 0; j < 6; j++) {
 			*is[i * 6 + j] = nn->model->nchw[bdx][j];
 		}
 	}
-	for (int i = 0; i < output_count(nn); i++) {
+	for (int i = 0; i < nn->model->output_count; i++) {
 		int bdx = nn->dst_bdx[i];
 		for (int j = 0; j < 6; j++) {
 			*os[i * 6 + j] = nn->model->nchw[bdx][j];

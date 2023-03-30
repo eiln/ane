@@ -83,23 +83,6 @@ unlock:
 	return err;
 }
 
-static void ane_iommu_unmap_pages(struct ane_device *ane, struct ane_bo *node)
-{
-	if (!node->mm)
-		return;
-
-	mutex_lock(&ane->iommu_lock);
-	for (u32 i = 0; i < node->npages; i++) {
-		dma_addr_t iova = node->iova + (i << ane->shift);
-		iommu_unmap(ane->domain, iova, 1UL << ane->shift);
-	}
-	drm_mm_remove_node(node->mm);
-	mutex_unlock(&ane->iommu_lock);
-
-	kfree(node->mm);
-	return;
-}
-
 static void ane_iommu_invalidate_tlb(struct ane_device *ane)
 {
 	mutex_lock(&ane->iommu_lock);
@@ -123,6 +106,26 @@ static void ane_iommu_invalidate_tlb(struct ane_device *ane)
 	writel(ane->hw->dart.inv, ane->dart2 + ane->hw->dart.cmd);
 
 	mutex_unlock(&ane->iommu_lock);
+}
+
+static void ane_iommu_unmap_pages(struct ane_device *ane, struct ane_bo *node)
+{
+	if (!node->mm)
+		return;
+
+	mutex_lock(&ane->iommu_lock);
+	for (u32 i = 0; i < node->npages; i++) {
+		dma_addr_t iova = node->iova + (i << ane->shift);
+		iommu_unmap(ane->domain, iova, 1UL << ane->shift);
+	}
+	drm_mm_remove_node(node->mm);
+	mutex_unlock(&ane->iommu_lock);
+
+	kfree(node->mm);
+
+	/* Conservatively invalidate after every unmap batch */
+	ane_iommu_invalidate_tlb(ane);
+	return;
 }
 
 static struct ane_bo *ane_bo_lookup(struct drm_file *file, u32 handle)

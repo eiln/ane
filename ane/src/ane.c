@@ -93,17 +93,6 @@ static void ane_iommu_invalidate_tlb(struct ane_device *ane)
 	writel(0x1, ane->dart2 + ane->hw->dart.sel);
 	writel(ane->hw->dart.inv, ane->dart2 + ane->hw->dart.cmd);
 
-	writel(ane->hw->dart.inv, ane->dart1 + ane->hw->dart.cmd);
-	writel(ane->hw->dart.inv, ane->dart2 + ane->hw->dart.cmd);
-
-	writel(0x1, ane->dart1 + ane->hw->dart.sel);
-	writel(ane->hw->dart.inv, ane->dart1 + ane->hw->dart.cmd);
-	writel(0x1, ane->dart2 + ane->hw->dart.sel);
-	writel(ane->hw->dart.inv, ane->dart2 + ane->hw->dart.cmd);
-
-	writel(ane->hw->dart.inv, ane->dart1 + ane->hw->dart.cmd);
-	writel(ane->hw->dart.inv, ane->dart2 + ane->hw->dart.cmd);
-
 	mutex_unlock(&ane->iommu_lock);
 }
 

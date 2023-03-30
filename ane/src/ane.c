@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only OR MIT
 /* Copyright 2022 Eileen Yoon <eyn@gmx.com> */
-/* IOMMU portions based on gpu/drm/tegra/drm.c */
 
 #define pr_fmt(fmt) "%s: %s: " fmt, KBUILD_MODNAME, __func__
 

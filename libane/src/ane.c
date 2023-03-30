@@ -11,27 +11,25 @@
 
 #define ANE_SYSFS_PATH "/dev/dri/renderD129"
 
-static struct ane_device *device_new(void)
+static int ane_open(struct ane_nn *nn)
 {
-	struct ane_device *ane = ane_zmalloc(sizeof(struct ane_device));
-	if (!ane)
-		return NULL;
+	struct ane_device *ane = &nn->ane;
 
-	ane->fd = open(ANE_SYSFS_PATH, O_RDWR, S_IRUSR | S_IWUSR);
-	if (ane->fd < 0) {
+	int fd = open(ANE_SYSFS_PATH, O_RDWR, S_IRUSR | S_IWUSR);
+	if (fd < 0) {
 		fprintf(stderr, "LIBANE: failed to open sysfs %s\n",
 			ANE_SYSFS_PATH);
-		free(ane);
-		return NULL;
+		return -ENODEV;
 	}
 
-	return ane;
+	ane->fd = fd;
+
+	return 0;
 }
 
-static void device_del(struct ane_device *ane)
+static void ane_close(struct ane_nn *nn)
 {
-	close(ane->fd);
-	free(ane);
+	close(nn->ane.fd);
 }
 
 struct ane_nn *ane_init(const struct ane_model *model)
@@ -44,23 +42,23 @@ struct ane_nn *ane_init(const struct ane_model *model)
 
 	nn->model = model;
 
-	nn->ane = device_new();
-	if (!nn->ane)
+	err = ane_open(nn);
+	if (err)
 		goto free;
 
-	err = ane_chan_init(nn->ane, nn);
+	err = ane_chan_init(&nn->ane, nn);
 	if (err) {
 		fprintf(stderr, "LIBANE: ane_chan_init failed with 0x%x\n",
 			err);
-		goto del;
+		goto close;
 	}
 
 	printf("LIBANE: initialized nn %p\n", (void *)nn);
 
 	return nn;
 
-del:
-	device_del(nn->ane);
+close:
+	ane_close(nn);
 free:
 	free(nn);
 	return NULL;
@@ -69,8 +67,8 @@ free:
 void ane_free(struct ane_nn *nn)
 {
 	printf("LIBANE: freeing nn %p\n", (void *)nn);
-	ane_chan_free(nn->ane, nn);
-	device_del(nn->ane);
+	ane_chan_free(&nn->ane, nn);
+	ane_close(nn);
 	free(nn);
 }
 
@@ -92,7 +90,7 @@ int ane_exec(struct ane_nn *nn)
 	}
 	args.fifo_handle = nn->fifo_chan->handle;
 
-	return ioctl(nn->ane->fd, DRM_IOCTL_ANE_SUBMIT, &args);
+	return ioctl(nn->ane.fd, DRM_IOCTL_ANE_SUBMIT, &args);
 }
 
 int ane_send_raw(struct ane_nn *nn, void *from, const int idx)

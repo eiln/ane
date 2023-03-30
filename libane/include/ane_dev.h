@@ -47,7 +47,7 @@ struct ane_bo {
 };
 
 struct ane_nn {
-	struct ane_device *ane;
+	struct ane_device ane;
 	const struct ane_model *model;
 	struct ane_bo *chans[TILE_COUNT];
 	struct ane_bo *fifo_chan;

@@ -235,7 +235,7 @@ static int ane_submit(struct drm_device *drm, void *data, struct drm_file *file)
 	int err;
 
 	struct ane_engine_req req;
-	memset(&req, 0, sizeof(struct ane_engine_req));
+	memset(&req, 0, sizeof(req));
 
 	req.nid = ANE_FIFO_NID;
 	req.td_size = args->td_size;
@@ -244,51 +244,43 @@ static int ane_submit(struct drm_device *drm, void *data, struct drm_file *file)
 	for (int bdx = 0; bdx < ANE_TILE_COUNT; bdx++) {
 		if (args->handles[bdx]) {
 			bo = ane_bo_lookup(file, args->handles[bdx]);
-			if (bo) {
-				req.bar[bdx] = lower_32_bits(bo->iova);
-			}
+			if (!bo)
+				return -EINVAL;
+			req.bar[bdx] = lower_32_bits(bo->iova);
 		}
 	}
 
 	/*
-	 * Naturally, Apple stores the compiled neural network as the
-	 * TD catted with the kernel @ 16 gran padding. This not only
-	 * takes advantage of bank aligned access, but it's also a
-	 * convienient serialization method, making one less non-aligned
-	 * buffer to worry about. We thus unpack the iova at which the
-	 * kernel *should* start.
+	 * Apple stores the compiled neural network as the TD catted
+	 * with the kernel @ 16 gran padding. This 1) takes advantage
+	 * of bank aligned access, 2) is a convienient serialization
+	 * method, making one less non-aligned buffer to worry about,
+	 * 3) makes my life easier :). We thus unpack the iova at which
+	 * the kernel *should* start.
 	 */
-	req.bar[1] = req.bar[0] + roundup(args->tsk_size, ANE_CMD_GRAN);
+	req.bar[1] = req.bar[0] + round_up(args->tsk_size, ANE_CMD_GRAN);
 
-	/*
-	 * Technically the firmware maintains a pool of fifo buffers
-	 * with each entry masked to jump to the next. However the
-	 * actual pool is just a firmware-level construct, and only two
-	 * valid entries, with the first instructed to jump to the second,
-	 * is needed to execute the (first) network. We could make this
-	 * mini per-network pool here but we can also get it from userspace.
-	 */
 	bo = ane_bo_lookup(file, args->fifo_handle);
 	if (!bo)
 		return -EINVAL;
 	req.fifo_addr = lower_32_bits(bo->iova);
 
-	// go go!
+	/*
+	 * Single threaded for now; cores are activated in parallel,
+	 * so scheduling would only improve the enqueue time, or
+	 * 36 writel()'s.
+	 */
 	mutex_lock(&ane->engine_lock);
 
 	err = ane_tm_enqueue(ane, &req);
 	if (err < 0)
-		goto error;
+		goto unlock;
 
 	err = ane_tm_execute(ane, &req);
 	if (err < 0)
-		goto error;
+		goto unlock;
 
-	mutex_unlock(&ane->engine_lock);
-
-	return 0;
-
-error:
+unlock:
 	mutex_unlock(&ane->engine_lock);
 	return err;
 }

@@ -43,7 +43,7 @@ static inline void ane_untile(void *data, void *tile, const uint64_t N,
 		(uint16_t(*)[N][C][new_H][new_W])tile;
 
 	const uint64_t data_size = N * C * H * W * sizeof(uint16_t);
-	memset(data, 0, data_size); // TODO; needed?
+	memset(data, 0, data_size);
 
 	for (uint64_t n = 0; n < N; n++) { // TODO; early exit on alignment
 		for (uint64_t c = 0; c < C; c++) {

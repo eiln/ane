@@ -8,6 +8,7 @@
 
 #include "ane_chan.h"
 #include "ane_priv.h"
+#include "ane_tile.h"
 
 #define ANE_SYSFS_PATH "/dev/dri/renderD129"
 
@@ -93,20 +94,28 @@ int ane_exec(struct ane_nn *nn)
 	return ioctl(nn->ane.fd, DRM_IOCTL_ANE_SUBMIT, &args);
 }
 
-int ane_send_raw(struct ane_nn *nn, void *from, const int idx)
+int __ane_send(struct ane_nn *nn, void *from, const int idx, const int raw)
 {
 	if (idx >= input_count(nn))
 		return -EINVAL;
-	memcpy(nn->chans[nn->src_bdx[idx]]->map, from,
-	       tile_size(nn, nn->src_bdx[idx]));
+
+	if (!raw) {
+		ane_tile_send(nn, from, idx);
+	} else {
+		ane_chan_send(nn, from, idx);
+	}
 	return 0;
 }
 
-int ane_read_raw(struct ane_nn *nn, void *to, const int idx)
+int __ane_read(struct ane_nn *nn, void *to, const int idx, const int raw)
 {
 	if (idx >= output_count(nn))
 		return -EINVAL;
-	memcpy(to, nn->chans[nn->dst_bdx[idx]]->map,
-	       tile_size(nn, nn->dst_bdx[idx]));
+
+	if (!raw) {
+		ane_tile_read(nn, to, idx);
+	} else {
+		ane_chan_read(nn, to, idx);
+	}
 	return 0;
 }

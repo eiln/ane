@@ -55,25 +55,22 @@ static const int TQ_PRTY_TABLE[ANE_TQ_COUNT] = { 0x1, 0x2, 0x3,	 0x4,
 #define TM_IS_IDLE	  0x1
 #define TM_IS_FINE	  0x22222222
 
-static inline u32 ane_eng_read32(struct ane_device *ane, u32 off)
+static inline u32 engine_read32(struct ane_device *ane, u32 off)
 {
 	return readl(ane->engine + off);
 }
 
-static inline void ane_eng_write32(struct ane_device *ane, u32 off, u32 val)
+static inline void engine_write32(struct ane_device *ane, u32 off, u32 val)
 {
 	writel(val, ane->engine + off);
 }
 
-#define tm_read32(ane, off)	  (ane_eng_read32(ane, ANE_TM_BASE + off))
-#define tq_read32(ane, off)	  (ane_eng_read32(ane, ANE_TQ_BASE + off))
+#define tm_read32(ane, off)	  (engine_read32(ane, ANE_TM_BASE + off))
+#define tq_read32(ane, off)	  (engine_read32(ane, ANE_TQ_BASE + off))
 
-#define tm_write32(ane, off, val) (ane_eng_write32(ane, ANE_TM_BASE + off, val))
-#define tq_write32(ane, off, val) (ane_eng_write32(ane, ANE_TQ_BASE + off, val))
+#define tm_write32(ane, off, val) (engine_write32(ane, ANE_TM_BASE + off, val))
+#define tq_write32(ane, off, val) (engine_write32(ane, ANE_TQ_BASE + off, val))
 
-/*
- * Resets with ANE_SET_* power domains
- */
 void ane_tm_enable(struct ane_device *ane)
 {
 	tm_write32(ane, TM_TQ_EN, tm_read32(ane, TM_TQ_EN) | 0x1000);
@@ -91,9 +88,6 @@ static inline int ane_tm_schedule_tq(struct ane_device *ane)
 	return ANE_DEFAULT_QID;
 }
 
-/*
- * Reserves request in a task queue
- */
 int ane_tm_enqueue(struct ane_device *ane, struct ane_engine_req *req)
 {
 	int qid = ane_tm_schedule_tq(ane);
@@ -110,15 +104,12 @@ int ane_tm_enqueue(struct ane_device *ane, struct ane_engine_req *req)
 		return -EINVAL;
 	}
 
-	/* activate/reserve queue */
 	tq_write32(ane, TQ_STATUS(qid), 0x1);
 
-	/* configure BAR for DMA chans */
 	for (int bdx = 0; bdx < ANE_BAR_SLOTS; bdx++) {
 		tq_write32(ane, TQ_BAR1(qid, bdx), req->bar[bdx]);
 	}
 
-	/* configure slot to execute network */
 	tq_write32(ane, TQ_SIZE1(qid),
 		   ((req->td_size << 0xe) + 0x1ff0000) & 0x1ff0000);
 	tq_write32(ane, TQ_ADDR1(qid), req->fifo_addr);
@@ -168,23 +159,17 @@ static inline void ane_tm_handle_irq(struct ane_device *ane)
 	}
 }
 
-/*
- * Executes a request on the engine
- */
 int ane_tm_execute(struct ane_device *ane, struct ane_engine_req *req)
 {
 	int err;
 
-	/* push forward request reserved in a task queue */
 	ane_tm_push_tq(ane, req);
 
-	/* poll until engine is idle */
 	err = ane_tm_get_status(ane);
 
-	/* clear & ack irq if sucesss */
 	ane_tm_handle_irq(ane);
 
-	tq_write32(ane, TQ_STATUS(req->qid), 0x0); /* free queue */
+	tq_write32(ane, TQ_STATUS(req->qid), 0x0);
 
 	return err;
 }

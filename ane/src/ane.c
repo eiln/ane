@@ -633,7 +633,7 @@ static const struct dev_pm_ops ane_pm_ops = {
 #define DART_T8020_TTBR			     0x200
 #define DART_T8020_STREAM_COMMAND_INVALIDATE BIT(20)
 
-static const struct ane_hw ane_hw_t8103 = {
+static const struct ane_hw ane_hw_t8103_ane = {
 	.base = 0x26a000000,
 	.ane_type = 64,
 	.ane_subtype = 0,
@@ -700,7 +700,7 @@ static const struct ane_hw ane_hw_t6000_ane2 = {
 };
 
 static const struct of_device_id ane_of_match[] = {
-	{ .compatible = "apple,t8103-ane", .data = &ane_hw_t8103 },
+	{ .compatible = "apple,t8103-ane", .data = &ane_hw_t8103_ane },
 	{}
 };
 

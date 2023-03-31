@@ -2,7 +2,13 @@
 /* Copyright 2022 Eileen Yoon <eyn@gmx.com> */
 
 #include "ane_priv.h"
-#include "ane_tile.h"
+
+#define chan_send(nn, from, idx)                        \
+	(memcpy(nn->chans[nn->src_bdx[idx]]->map, from, \
+		tile_size(nn, nn->src_bdx[idx])))
+#define chan_read(nn, to, idx)                        \
+	(memcpy(to, nn->chans[nn->dst_bdx[idx]]->map, \
+		tile_size(nn, nn->dst_bdx[idx])))
 
 static inline void ane_tile(void *data, void *tile, const uint64_t N,
 			    const uint64_t C, const uint64_t H,
@@ -57,7 +63,7 @@ static inline void ane_untile(void *data, void *tile, const uint64_t N,
 	return;
 }
 
-int ane_tile_send(struct ane_nn *nn, void *from, const int idx)
+static inline void tile_send(struct ane_nn *nn, void *from, const int idx)
 {
 	const struct ane_model *model = nn->model;
 	const int bdx = nn->src_bdx[idx];
@@ -68,23 +74,36 @@ int ane_tile_send(struct ane_nn *nn, void *from, const int idx)
 	ane_tile(from, tile, model->nchw[bdx][0], model->nchw[bdx][1],
 		 model->nchw[bdx][2], model->nchw[bdx][3], model->nchw[bdx][4],
 		 model->nchw[bdx][5]);
-	ane_chan_send(nn, tile, idx);
-
-	return 0;
+	chan_send(nn, tile, idx);
 }
 
-int ane_tile_read(struct ane_nn *nn, void *to, const int idx)
+static inline void tile_read(struct ane_nn *nn, void *to, const int idx)
 {
 	const struct ane_model *model = nn->model;
 	const int bdx = nn->dst_bdx[idx];
 
 	uint16_t tile[tile_size(nn, bdx) / sizeof(uint16_t)];
-	// memset(tile, 0, tile_size(nn, bdx));
+	chan_read(nn, tile, idx);
 
-	ane_chan_read(nn, tile, idx);
 	ane_untile(to, tile, model->nchw[bdx][0], model->nchw[bdx][1],
 		   model->nchw[bdx][2], model->nchw[bdx][3],
 		   model->nchw[bdx][4], model->nchw[bdx][5]);
+}
 
-	return 0;
+void ane_tile_send(struct ane_nn *nn, void *from, const int idx, const int raw)
+{
+	if (!raw) {
+		tile_send(nn, from, idx);
+	} else {
+		chan_send(nn, from, idx);
+	}
+}
+
+void ane_tile_read(struct ane_nn *nn, void *to, const int idx, const int raw)
+{
+	if (!raw) {
+		tile_read(nn, to, idx);
+	} else {
+		chan_read(nn, to, idx);
+	}
 }

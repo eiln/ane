@@ -98,12 +98,7 @@ int __ane_send(struct ane_nn *nn, void *from, const int idx, const int raw)
 {
 	if (idx >= input_count(nn))
 		return -EINVAL;
-
-	if (!raw) {
-		ane_tile_send(nn, from, idx);
-	} else {
-		ane_chan_send(nn, from, idx);
-	}
+	ane_tile_send(nn, from, idx, raw);
 	return 0;
 }
 
@@ -111,11 +106,6 @@ int __ane_read(struct ane_nn *nn, void *to, const int idx, const int raw)
 {
 	if (idx >= output_count(nn))
 		return -EINVAL;
-
-	if (!raw) {
-		ane_tile_read(nn, to, idx);
-	} else {
-		ane_chan_read(nn, to, idx);
-	}
+	ane_tile_read(nn, to, idx, raw);
 	return 0;
 }

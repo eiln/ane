@@ -27,8 +27,7 @@ will install
 
 `libane` requires `libdrm` to make ioctl calls, but that really should be there.
 The static archive /usr/lib/libane.a is compiled at `-std=gnu99 -O2`.
-The exposed header, /usr/include/libane/ane.h
-requires only `<asm/types.h>` (for kernel __u types) and `<stdint.h>`.
+The exposed header, /usr/include/libane/ane.h requires just`<stdint.h>`.
 
 
 ### Conversion
@@ -126,7 +125,7 @@ Example like [cblas](https://www.gnu.org/software/gsl/doc/html/cblas.html):
 
 Compile with `gcc` or `g++`:
 
-	gcc -I/usr/include/accel?/idk -I/usr/include/libane
+	gcc -I/usr/include/libane \
 		matmul.anec.o anec_matmul.o \
 		main.c -o main.out \
 		/usr/lib/libane.a

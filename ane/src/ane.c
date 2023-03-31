@@ -399,7 +399,7 @@ static const struct drm_driver ane_drm_driver = {
 	.minor = 0,
 };
 
-static int ane_remap_ttbr(struct ane_device *ane)
+static int ane_iommu_remap_ttbr(struct ane_device *ane)
 {
 	void __iomem *reg;
 
@@ -416,11 +416,6 @@ static int ane_remap_ttbr(struct ane_device *ane)
 	return 0;
 }
 
-static void ane_iommu_domain_free(struct ane_device *ane)
-{
-	drm_mm_takedown(&ane->mm);
-}
-
 static int ane_iommu_domain_init(struct ane_device *ane)
 {
 	dma_addr_t min_iova, max_iova;
@@ -433,7 +428,7 @@ static int ane_iommu_domain_init(struct ane_device *ane)
 	ane->domain = domain;
 	ane->shift = __ffs(ane->domain->pgsize_bitmap);
 
-	err = ane_remap_ttbr(ane);
+	err = ane_iommu_remap_ttbr(ane);
 	if (err < 0)
 		return err;
 
@@ -447,6 +442,11 @@ static int ane_iommu_domain_init(struct ane_device *ane)
 	drm_mm_init(&ane->mm, min_iova, max_iova);
 
 	return 0;
+}
+
+static void ane_iommu_domain_free(struct ane_device *ane)
+{
+	drm_mm_takedown(&ane->mm);
 }
 
 static void ane_detach_genpd(struct ane_device *ane)

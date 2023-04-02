@@ -30,40 +30,40 @@ struct ane_bo {
 
 #define to_bo(gem) (container_of(gem, struct ane_bo, base))
 
-static int ane_iommu_map_pages(struct ane_device *ane, struct ane_bo *node)
+static int ane_iommu_map_pages(struct ane_device *ane, struct ane_bo *bo)
 {
 	int err;
 
-	if (node->mm)
+	if (bo->mm)
 		return -EBUSY;
 
-	node->mm = kzalloc(sizeof(*node->mm), GFP_KERNEL);
-	if (!node->mm)
+	bo->mm = kzalloc(sizeof(*bo->mm), GFP_KERNEL);
+	if (!bo->mm)
 		return -ENOMEM;
 
 	mutex_lock(&ane->iommu_lock);
 
 	/* reserve area from ANE address space */
-	err = drm_mm_insert_node_generic(&ane->mm, node->mm,
-					 node->npages << ane->shift,
+	err = drm_mm_insert_node_generic(&ane->mm, bo->mm,
+					 bo->npages << ane->shift,
 					 1UL << ane->shift, 0, 0);
 	if (err < 0) {
 		dev_err(ane->dev, "out of ANE space: %d\n", err);
 		goto unlock;
 	}
 
-	node->iova = node->mm->start;
+	bo->iova = bo->mm->start;
 
 	/* map into ANE address space */
-	for (u32 i = 0; i < node->npages; i++) {
-		dma_addr_t iova = node->iova + (i << ane->shift);
-		err = iommu_map(ane->domain, iova, page_to_phys(node->pages[i]),
+	for (u32 i = 0; i < bo->npages; i++) {
+		dma_addr_t iova = bo->iova + (i << ane->shift);
+		err = iommu_map(ane->domain, iova, page_to_phys(bo->pages[i]),
 				1UL << ane->shift, IOMMU_READ | IOMMU_WRITE);
 		if (err < 0) {
 			dev_err(ane->dev, "iommu_map failed at 0x%llx", iova);
 			while (i-- > 0) {
 				iommu_unmap(ane->domain,
-					    node->iova + (i << ane->shift),
+					    bo->iova + (i << ane->shift),
 					    1UL << ane->shift);
 			}
 			goto remove;
@@ -75,10 +75,10 @@ static int ane_iommu_map_pages(struct ane_device *ane, struct ane_bo *node)
 	return 0;
 
 remove:
-	drm_mm_remove_node(node->mm);
+	drm_mm_remove_node(bo->mm);
 unlock:
 	mutex_unlock(&ane->iommu_lock);
-	kfree(node->mm);
+	kfree(bo->mm);
 	return err;
 }
 
@@ -96,24 +96,23 @@ static void ane_iommu_invalidate_tlb(struct ane_device *ane)
 	mutex_unlock(&ane->iommu_lock);
 }
 
-static void ane_iommu_unmap_pages(struct ane_device *ane, struct ane_bo *node)
+static void ane_iommu_unmap_pages(struct ane_device *ane, struct ane_bo *bo)
 {
-	if (!node->mm)
+	if (!bo->mm)
 		return;
 
 	mutex_lock(&ane->iommu_lock);
-	for (u32 i = 0; i < node->npages; i++) {
-		dma_addr_t iova = node->iova + (i << ane->shift);
+	for (u32 i = 0; i < bo->npages; i++) {
+		dma_addr_t iova = bo->iova + (i << ane->shift);
 		iommu_unmap(ane->domain, iova, 1UL << ane->shift);
 	}
-	drm_mm_remove_node(node->mm);
+	drm_mm_remove_node(bo->mm);
 	mutex_unlock(&ane->iommu_lock);
 
-	kfree(node->mm);
+	kfree(bo->mm);
 
 	/* Conservatively invalidate after every unmap batch */
 	ane_iommu_invalidate_tlb(ane);
-	return;
 }
 
 static struct ane_bo *ane_bo_lookup(struct drm_file *file, u32 handle)

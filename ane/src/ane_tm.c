@@ -11,7 +11,6 @@
 static const int TQ_PRTY_TABLE[ANE_TQ_COUNT] = { 0x1, 0x2, 0x3,	 0x4,
 						 0x5, 0x6, 0x1e, 0x1f };
 
-#define ANE_TM_IRQ_LINES  2
 #define ANE_DEFAULT_QID	  4
 
 #define ANE_TM_BASE	  0x20000
@@ -141,20 +140,24 @@ static inline int ane_tm_get_status(struct ane_device *ane)
 
 static inline void ane_tm_handle_irq(struct ane_device *ane)
 {
-	for (int line = 0; line < ANE_TM_IRQ_LINES; line++) {
-		u32 evtc = tm_read32(ane, TM_IRQ_EVTC(line));
+	int line;
 
-		for (u32 evtn = 0; evtn < evtc; evtn++) {
-			tm_read32(ane, TM_IRQ_INFO(line));
-			tm_read32(ane, TM_IRQ_UNK1(line));
-			tm_read32(ane, TM_IRQ_TMST(line));
-			tm_read32(ane, TM_IRQ_UNK2(line));
-		}
+	line = 0;
+	for (u32 n = 0; n < tm_read32(ane, TM_IRQ_EVTC(line)); n++) {
+		tm_read32(ane, TM_IRQ_INFO(line));
+		tm_read32(ane, TM_IRQ_UNK1(line));
+		tm_read32(ane, TM_IRQ_TMST(line));
+		tm_read32(ane, TM_IRQ_UNK2(line));
+	}
 
-		if (!line) {
-			tm_write32(ane, TM_IRQ_ACK,
-				   tm_read32(ane, TM_IRQ_ACK) | 2);
-		}
+	tm_write32(ane, TM_IRQ_ACK, tm_read32(ane, TM_IRQ_ACK) | 2);
+
+	line = 1;
+	for (u32 n = 0; n < tm_read32(ane, TM_IRQ_EVTC(line)); n++) {
+		tm_read32(ane, TM_IRQ_INFO(line));
+		tm_read32(ane, TM_IRQ_UNK1(line));
+		tm_read32(ane, TM_IRQ_TMST(line));
+		tm_read32(ane, TM_IRQ_UNK2(line));
 	}
 }
 

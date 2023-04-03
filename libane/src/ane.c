@@ -3,6 +3,7 @@
 
 #include <drm.h>
 #include <fcntl.h>
+#include <stdlib.h> // nn malloc
 #include <sys/ioctl.h>
 #include <unistd.h>
 
@@ -37,9 +38,10 @@ struct ane_nn *ane_init(const struct ane_model *model)
 {
 	int err;
 
-	struct ane_nn *nn = ane_zmalloc(sizeof(struct ane_nn));
+	struct ane_nn *nn = malloc(sizeof(struct ane_nn));
 	if (!nn)
 		return NULL;
+	memset(nn, 0, sizeof(struct ane_nn));
 
 	nn->model = model;
 
@@ -85,11 +87,11 @@ int ane_exec(struct ane_nn *nn)
 	args.td_size = anec->td_size;
 
 	for (int bdx = 0; bdx < ANE_TILE_COUNT; bdx++) {
-		if (nn->chans[bdx]) {
-			args.handles[bdx] = nn->chans[bdx]->handle;
+		if (anec->tiles[bdx]) {
+			args.handles[bdx] = nn->chans[bdx].handle;
 		}
 	}
-	args.fifo_handle = nn->fifo_chan->handle;
+	args.fifo_handle = nn->fifo_chan.handle;
 
 	return ioctl(nn->ane.fd, DRM_IOCTL_ANE_SUBMIT, &args);
 }

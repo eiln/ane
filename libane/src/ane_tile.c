@@ -3,11 +3,11 @@
 
 #include "ane_priv.h"
 
-#define chan_send(nn, from, idx)                        \
-	(memcpy(nn->chans[nn->src_bdx[idx]]->map, from, \
+#define chan_send(nn, from, idx)                       \
+	(memcpy(nn->chans[nn->src_bdx[idx]].map, from, \
 		tile_size(nn, nn->src_bdx[idx])))
-#define chan_read(nn, to, idx)                        \
-	(memcpy(to, nn->chans[nn->dst_bdx[idx]]->map, \
+#define chan_read(nn, to, idx)                       \
+	(memcpy(to, nn->chans[nn->dst_bdx[idx]].map, \
 		tile_size(nn, nn->dst_bdx[idx])))
 
 static inline void ane_tile(void *data, void *tile, const uint64_t N,

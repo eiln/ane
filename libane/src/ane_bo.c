@@ -35,42 +35,32 @@ static inline int bo_mmap(struct ane_device *ane, struct ane_bo *bo)
 	return 0;
 }
 
-struct ane_bo *ane_bo_init(struct ane_device *ane, uint64_t size)
+int ane_bo_init(struct ane_device *ane, struct ane_bo *bo)
 {
 	int err;
 
-	struct ane_bo *bo = ane_zmalloc(sizeof(struct ane_bo));
-	if (!bo)
-		goto error;
-
-	bo->size = size;
+	if (!bo->size)
+		return -EINVAL;
 
 	err = bo_init(ane, bo);
 	if (err < 0) {
 		fprintf(stderr, "LIBANE: bo_init failed with 0x%x\n", err);
-		goto free;
+		return err;
 	}
 
 	err = bo_mmap(ane, bo);
 	if (err < 0) {
+		bo_free(ane, bo);
 		fprintf(stderr, "LIBANE: bo_mmap failed with 0x%x\n", err);
-		goto free2;
+		return err;
 	}
 
-	return bo;
-
-free2:
-	bo_free(ane, bo);
-free:
-	free(bo);
-error:
-	return NULL;
+	return 0;
 }
 
 int ane_bo_free(struct ane_device *ane, struct ane_bo *bo)
 {
 	munmap(bo->map, bo->size);
 	bo_free(ane, bo);
-	free(bo);
 	return 0;
 }

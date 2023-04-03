@@ -19,25 +19,25 @@ static inline void load_anec(struct ane_nn *nn)
 	const struct anec *anec = to_anec(nn);
 	const void *anec_data = nn->model->data;
 
-	memcpy(nn->chans[0]->map, anec_data, anec->size);
+	memcpy(nn->chans[0].map, anec_data, anec->size);
 
 	/* do not fucking overflow */
-	memcpy(nn->fifo_chan->map, anec_data, anec->td_size);
-	memcpy(nn->fifo_chan->map + FIFO_WIDTH, anec_data, anec->td_size);
+	memcpy(nn->fifo_chan.map, anec_data, anec->td_size);
+	memcpy(nn->fifo_chan.map + FIFO_WIDTH, anec_data, anec->td_size);
 
-	set_nid(nn->fifo_chan->map, ANE_FIFO_NID);
-	set_nid(nn->fifo_chan->map + FIFO_WIDTH, ANE_FIFO_NID + FIFO_COUNT);
+	set_nid(nn->fifo_chan.map, ANE_FIFO_NID);
+	set_nid(nn->fifo_chan.map + FIFO_WIDTH, ANE_FIFO_NID + FIFO_COUNT);
 }
 
 int ane_chan_free(struct ane_device *ane, struct ane_nn *nn)
 {
-	if (nn->fifo_chan) {
-		ane_bo_free(ane, nn->fifo_chan);
+	if (nn->fifo_chan.map) {
+		ane_bo_free(ane, &nn->fifo_chan);
 	}
 
 	for (int bdx = 0; bdx < ANE_TILE_COUNT; bdx++) {
-		if (nn->chans[bdx]) {
-			ane_bo_free(ane, nn->chans[bdx]);
+		if (nn->chans[bdx].map) {
+			ane_bo_free(ane, &nn->chans[bdx]);
 		}
 	}
 
@@ -66,16 +66,15 @@ int ane_chan_init(struct ane_device *ane, struct ane_nn *nn)
 
 	for (int bdx = 0; bdx < ANE_TILE_COUNT; bdx++) {
 		if (anec->tiles[bdx]) {
-			struct ane_bo *bo = NULL;
-			bo = ane_bo_init(ane, tile_size(nn, bdx));
-			if (!bo)
+			struct ane_bo *bo = &nn->chans[bdx];
+			bo->size = tile_size(nn, bdx);
+			if (ane_bo_init(ane, bo) < 0)
 				goto error;
-			nn->chans[bdx] = bo;
 		}
 	}
 
-	nn->fifo_chan = ane_bo_init(ane, tile_align(FIFO_WIDTH * 2));
-	if (!nn->fifo_chan)
+	nn->fifo_chan.size = tile_align(FIFO_WIDTH * 2);
+	if (ane_bo_init(ane, &nn->fifo_chan) < 0)
 		goto error;
 
 	load_anec(nn);

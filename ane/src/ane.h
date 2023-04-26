@@ -7,6 +7,8 @@
 #include <drm/drm_device.h>
 #include <drm/drm_mm.h>
 
+#include "include/drm_ane.h"
+
 struct ane_device {
 	struct drm_device drm;
 	struct device *dev;
@@ -55,15 +57,13 @@ struct ane_hw {
 	} dart;
 };
 
-#define ANE_BAR_SLOTS 0x20 // same as ANE_TILE_COUNT
-
 struct ane_request {
 	int qid;
 	u32 nid;
 	u32 td_size;
 	u32 td_count;
 	u32 fifo_addr;
-	u32 bar[ANE_BAR_SLOTS];
+	u32 bar[ANE_TILE_COUNT];
 };
 
 #endif /* __ANE_H__ */

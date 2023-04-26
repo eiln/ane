@@ -18,7 +18,6 @@
 
 #include "ane.h"
 #include "ane_tm.h"
-#include "include/drm_ane.h"
 
 struct ane_bo {
 	struct drm_gem_object base;

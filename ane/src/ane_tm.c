@@ -92,11 +92,14 @@ int ane_tm_enqueue(struct ane_device *ane, struct ane_engine_req *req)
 	int qid = ane_tm_schedule_tq(ane);
 	req->qid = qid;
 
+#if 0
+	// this sucks. write actual resetter
 	if ((tm_read32(ane, TM_ERROR1) != TM_IS_FINE) ||
 	    (tm_read32(ane, TM_ERROR2) != TM_IS_FINE)) {
 		dev_err(ane->dev, "engine at failure state\n");
 		return -EINVAL;
 	}
+#endif
 
 	if (tq_read32(ane, TQ_PRTY(qid)) != TQ_PRTY_TABLE[qid]) {
 		dev_err(ane->dev, "invalid priority setup for tq %d\n", qid);

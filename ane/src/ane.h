@@ -19,6 +19,7 @@ struct ane_device {
 	void __iomem *engine; /* Engine MMIO range */
 	void __iomem *dart1; /* Auxiliary IOMMU range for DMA */
 	void __iomem *dart2; /* Auxiliary IOMMU range for DMA */
+	void __iomem *ttbr;
 
 	struct drm_mm mm; /* IOMMU space allocator */
 	struct iommu_domain *domain;

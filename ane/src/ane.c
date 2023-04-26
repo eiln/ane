@@ -398,27 +398,9 @@ static const struct drm_driver ane_drm_driver = {
 	.minor = 0,
 };
 
-static int ane_iommu_remap_ttbr(struct ane_device *ane)
-{
-	void __iomem *reg;
-
-	reg = ioremap(ane->hw->dart.base + ane->hw->dart.ttbr, sizeof(u32));
-	if (IS_ERR(reg))
-		return PTR_ERR(reg);
-
-	/* L2 DMA transfers fail without */
-	writel_relaxed(readl_relaxed(reg), ane->dart1 + ane->hw->dart.ttbr);
-	writel_relaxed(readl_relaxed(reg), ane->dart2 + ane->hw->dart.ttbr);
-
-	iounmap(reg);
-
-	return 0;
-}
-
 static int ane_iommu_domain_init(struct ane_device *ane)
 {
 	dma_addr_t min_iova, max_iova;
-	int err;
 
 	struct iommu_domain *domain = iommu_get_domain_for_dev(ane->dev);
 	if (!domain)
@@ -426,10 +408,6 @@ static int ane_iommu_domain_init(struct ane_device *ane)
 
 	ane->domain = domain;
 	ane->shift = __ffs(ane->domain->pgsize_bitmap);
-
-	err = ane_iommu_remap_ttbr(ane);
-	if (err < 0)
-		return err;
 
 	/* DMA chans can't access iovas past the limit */
 	/* likely a kernel prefetch distance constraint */
@@ -446,6 +424,21 @@ static int ane_iommu_domain_init(struct ane_device *ane)
 static void ane_iommu_domain_free(struct ane_device *ane)
 {
 	drm_mm_takedown(&ane->mm);
+}
+
+static void ane_iommu_remap_ttbr(struct ane_device *ane)
+{
+	/* L2 DMA transfers fail without */
+	writel_relaxed(readl_relaxed(ane->ttbr),
+		       ane->dart1 + ane->hw->dart.ttbr);
+	writel_relaxed(readl_relaxed(ane->ttbr),
+		       ane->dart2 + ane->hw->dart.ttbr);
+}
+
+static void ane_hw_reset(struct ane_device *ane)
+{
+	ane_iommu_remap_ttbr(ane);
+	ane_tm_enable(ane);
 }
 
 static void ane_detach_genpd(struct ane_device *ane)
@@ -557,6 +550,13 @@ static int ane_platform_probe(struct platform_device *pdev)
 		goto detach_genpd;
 	}
 
+	ane->ttbr = devm_ioremap(
+		ane->dev, ane->hw->dart.base + ane->hw->dart.ttbr, sizeof(u32));
+	if (IS_ERR(ane->ttbr)) {
+		err = PTR_ERR(ane->ttbr);
+		goto detach_genpd;
+	}
+
 	mutex_init(&ane->iommu_lock);
 	mutex_init(&ane->engine_lock);
 
@@ -564,7 +564,7 @@ static int ane_platform_probe(struct platform_device *pdev)
 	if (err < 0)
 		goto detach_genpd;
 
-	ane_tm_enable(ane);
+	ane_hw_reset(ane);
 
 	/* measured 3s on macos, but 1s seems more stable */
 	pm_runtime_set_autosuspend_delay(ane->dev, 1000);
@@ -615,7 +615,7 @@ static int __maybe_unused ane_runtime_suspend(struct device *dev)
 static int __maybe_unused ane_runtime_resume(struct device *dev)
 {
 	struct ane_device *ane = dev_get_drvdata(dev);
-	ane_tm_enable(ane);
+	ane_hw_reset(ane);
 	return 0;
 }
 

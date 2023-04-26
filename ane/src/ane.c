@@ -233,7 +233,7 @@ static int ane_submit(struct drm_device *drm, void *data, struct drm_file *file)
 	struct ane_bo *bo = NULL;
 	int err;
 
-	struct ane_engine_req req;
+	struct ane_request req;
 	memset(&req, 0, sizeof(req));
 
 	req.nid = ANE_FIFO_NID;

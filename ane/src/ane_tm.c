@@ -82,7 +82,7 @@ static inline int ane_tm_schedule_tq(struct ane_device *ane)
 	return ANE_DEFAULT_QID;
 }
 
-int ane_tm_enqueue(struct ane_device *ane, struct ane_engine_req *req)
+int ane_tm_enqueue(struct ane_device *ane, struct ane_request *req)
 {
 	int qid = ane_tm_schedule_tq(ane);
 	req->qid = qid;
@@ -115,7 +115,7 @@ int ane_tm_enqueue(struct ane_device *ane, struct ane_engine_req *req)
 }
 
 static inline void ane_tm_push_tq(struct ane_device *ane,
-				  struct ane_engine_req *req)
+				  struct ane_request *req)
 {
 	int qid = req->qid;
 	tm_write32(ane, TM_ADDR, tq_read32(ane, TQ_ADDR1(qid)));
@@ -159,7 +159,7 @@ static inline void ane_tm_handle_irq(struct ane_device *ane)
 	}
 }
 
-int ane_tm_execute(struct ane_device *ane, struct ane_engine_req *req)
+int ane_tm_execute(struct ane_device *ane, struct ane_request *req)
 {
 	int err;
 

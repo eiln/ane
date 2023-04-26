@@ -57,7 +57,7 @@ struct ane_hw {
 
 #define ANE_BAR_SLOTS 0x20 // same as ANE_TILE_COUNT
 
-struct ane_engine_req {
+struct ane_request {
 	int qid;
 	u32 nid;
 	u32 td_size;

@@ -29,19 +29,13 @@ static inline void load_anec(struct ane_nn *nn)
 	set_nid(nn->fifo_chan.map + FIFO_WIDTH, ANE_FIFO_NID + FIFO_COUNT);
 }
 
-int ane_chan_free(struct ane_device *ane, struct ane_nn *nn)
+void ane_chan_free(struct ane_device *ane, struct ane_nn *nn)
 {
-	if (nn->fifo_chan.map) {
-		ane_bo_free(ane, &nn->fifo_chan);
-	}
+	ane_bo_free(ane, &nn->fifo_chan);
 
 	for (int bdx = 0; bdx < ANE_TILE_COUNT; bdx++) {
-		if (nn->chans[bdx].map) {
-			ane_bo_free(ane, &nn->chans[bdx]);
-		}
+		ane_bo_free(ane, &nn->chans[bdx]);
 	}
-
-	return 0;
 }
 
 int ane_chan_init(struct ane_device *ane, struct ane_nn *nn)

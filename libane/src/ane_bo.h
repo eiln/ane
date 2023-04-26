@@ -7,6 +7,6 @@
 #include "ane_dev.h"
 
 int ane_bo_init(struct ane_device *ane, struct ane_bo *bo);
-int ane_bo_free(struct ane_device *ane, struct ane_bo *bo);
+void ane_bo_free(struct ane_device *ane, struct ane_bo *bo);
 
 #endif /* __ANE_BO_H__ */

@@ -58,9 +58,10 @@ int ane_bo_init(struct ane_device *ane, struct ane_bo *bo)
 	return 0;
 }
 
-int ane_bo_free(struct ane_device *ane, struct ane_bo *bo)
+void ane_bo_free(struct ane_device *ane, struct ane_bo *bo)
 {
-	munmap(bo->map, bo->size);
-	bo_free(ane, bo);
-	return 0;
+	if (bo->map) {
+		munmap(bo->map, bo->size);
+		bo_free(ane, bo);
+	}
 }

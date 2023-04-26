@@ -11,8 +11,8 @@
 #include <linux/pm_domain.h>
 #include <linux/pm_runtime.h>
 
+#include <drm/drm_accel.h>
 #include <drm/drm_drv.h>
-#include <drm/drm_file.h> // <drm/drm_accel.h>
 #include <drm/drm_gem.h>
 #include <drm/drm_ioctl.h>
 

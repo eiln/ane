@@ -249,12 +249,9 @@ static int ane_submit(struct drm_device *drm, void *data, struct drm_file *file)
 	}
 
 	/*
-	 * Apple stores the compiled neural network as the TD catted
-	 * with the kernel @ 16 gran padding. This 1) takes advantage
-	 * of bank aligned access, 2) is a convienient serialization
-	 * method, making one less non-aligned buffer to worry about,
-	 * 3) makes my life easier :). We thus unpack the iova at which
-	 * the kernel *should* start.
+	 * The microcode and weights are packed @ 16 gran for bank aligned
+	 * access. Since this isn't page aligned, we represent the two as one
+	 * buffer and calculate the delimiter (where the weights would start).
 	 */
 	req.bar[1] = req.bar[0] + round_up(args->tsk_size, ANE_CMD_GRAN);
 
@@ -408,11 +405,12 @@ static int ane_iommu_domain_init(struct ane_device *ane)
 	ane->domain = domain;
 	ane->shift = __ffs(ane->domain->pgsize_bitmap);
 
-	/* DMA chans can't access iovas past the limit */
-	/* likely a kernel prefetch distance constraint */
 	min_iova = ane->hw->dart.vm_base;
 
-	/* a page before as to not reach real limit */
+	/*
+	 * DMA doesn't work for iovas greater than vm_size, prolly a prefetch
+	 * distance constraint. Use a page before to not reach the real limit.
+	 */
 	max_iova = min_iova + ane->hw->dart.vm_size - (1UL << ane->shift);
 
 	drm_mm_init(&ane->mm, min_iova, max_iova);
@@ -427,7 +425,7 @@ static void ane_iommu_domain_free(struct ane_device *ane)
 
 static void ane_iommu_remap_ttbr(struct ane_device *ane)
 {
-	/* L2 DMA transfers fail without */
+	/* L2 DMA fails without */
 	writel_relaxed(readl_relaxed(ane->ttbr),
 		       ane->dart1 + ane->hw->dart.ttbr);
 	writel_relaxed(readl_relaxed(ane->ttbr),
@@ -565,7 +563,7 @@ static int ane_platform_probe(struct platform_device *pdev)
 
 	ane_hw_reset(ane);
 
-	/* measured 3s on macos, but 1s seems more stable */
+	/* Measured 3sec on macos, but 1sec seems more stable */
 	pm_runtime_set_autosuspend_delay(ane->dev, 1000);
 	pm_runtime_use_autosuspend(ane->dev);
 

@@ -36,7 +36,7 @@ The exposed header, /usr/include/libane/ane.h requires just`<stdint.h>`.
 
 Generates
 
-	anec_$name.h, anec_$name.o, $name.anec.o
+	$name.anec.o, anec_$name.h
 
 
 ### Usage
@@ -56,8 +56,7 @@ Originally the header would each define the `struct ane_model`
 to call `ane_init()`, but struct initializers are a sin in cpp apparently.
 Also people shouldn't be editing that.
 So now the model struct gets wrapped into
-`struct ane_nn *ane_init_$name(void)`,
-declared in `anec_$name.h` & `anec_$name.o`.
+`struct ane_nn *ane_init_$name(void)` declared in `anec_$name.h`.
 If you're curious of the struct in question,
 run the [super-secret backend](https://github.com/eiln/anecc/tree/main/anect/anect):
 `anect --help`.
@@ -125,12 +124,13 @@ Example like [cblas](https://www.gnu.org/software/gsl/doc/html/cblas.html):
 
 Compile with `gcc` or `g++`:
 
-	gcc -I/usr/include/libane \
-		matmul.anec.o anec_matmul.o \
-		main.c -o main.out \
-		/usr/lib/libane.a
+	gcc -I/usr/include/libane matmul.anec.o main.c -o main -lane
 
-Or link `-lane` in place of `/usr/lib/libane.a`.
+Following this form:
+
+	[cc] [-I/usr/include/libane] [*.anec.o] [other stuff] [link]
+
+The libane link can be `-lane` or `/usr/lib/libane.a`.
 
 
 

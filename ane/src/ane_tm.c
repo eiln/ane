@@ -11,8 +11,6 @@
 static const int TQ_PRTY_TABLE[ANE_TQ_COUNT] = { 0x1, 0x2, 0x3,	 0x4,
 						 0x5, 0x6, 0x1e, 0x1f };
 
-#define ANE_DEFAULT_QID		  4
-
 #define ANE_TM_BASE		  0x20000
 #define ANE_TQ_BASE		  0x21000
 
@@ -77,15 +75,9 @@ void ane_tm_enable(struct ane_device *ane)
 	tm_write32_rel(ane, TM_IRQ_EN2, 0x6);
 }
 
-static inline int ane_tm_schedule_tq(struct ane_device *ane)
-{
-	return ANE_DEFAULT_QID;
-}
-
 int ane_tm_enqueue(struct ane_device *ane, struct ane_request *req)
 {
-	int qid = ane_tm_schedule_tq(ane);
-	req->qid = qid;
+	int qid = req->qid;
 
 #if 0
 	// this sucks. write actual resetter

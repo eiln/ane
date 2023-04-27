@@ -3,7 +3,7 @@
 
 #define pr_fmt(fmt) "%s: %s: " fmt, KBUILD_MODNAME, __func__
 
-#include <linux/interrupt.h> // sigh
+#include <linux/interrupt.h>
 #include <linux/iommu.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
@@ -529,7 +529,7 @@ static int ane_platform_probe(struct platform_device *pdev)
 		err = -ENODEV;
 		goto detach_genpd;
 	}
-	disable_irq(ane->dart_irq); // sigh
+	disable_irq(ane->dart_irq);
 
 	ane->engine = devm_platform_ioremap_resource_byname(pdev, "engine");
 	if (IS_ERR(ane->engine)) {

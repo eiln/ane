@@ -88,11 +88,6 @@ int ane_tm_enqueue(struct ane_device *ane, struct ane_request *req)
 	}
 #endif
 
-	if (tq_read32(ane, TQ_PRTY(qid)) != TQ_PRTY_TABLE[qid]) {
-		dev_err(ane->dev, "invalid priority setup for tq %d\n", qid);
-		return -EINVAL;
-	}
-
 	tq_write32(ane, TQ_STATUS(qid), 0x1);
 
 	for (int bdx = 0; bdx < ANE_TILE_COUNT; bdx++) {

@@ -1,9 +1,7 @@
 
-
 # Asahi Neural Engine
 
-	ane - driver / kernel module
-	libane - userspace lib
-	python - libane python bindings
-
-[libane documentation](libane.md)
+- ane: prototype driver kmod
+- docs: documentation
+- libane: userspace lib
+- python: python bindings for libane

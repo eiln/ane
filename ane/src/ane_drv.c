@@ -265,11 +265,7 @@ static int ane_submit(struct drm_device *drm, void *data, struct drm_file *file)
 		return -EINVAL;
 	req.fifo_addr = lower_32_bits(bo->iova);
 
-	/*
-	 * Single threaded for now; cores are activated in parallel,
-	 * so scheduling would only improve the enqueue time, or
-	 * 36 writel()'s.
-	 */
+	// TODO
 	mutex_lock(&ane->engine_lock);
 
 	err = ane_tm_enqueue(ane, &req);

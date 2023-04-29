@@ -19,6 +19,9 @@
 #include "ane.h"
 #include "ane_tm.h"
 
+#define CMD_BUF_BDX 0
+#define KRN_BUF_BDX 1
+
 struct ane_bo {
 	struct drm_gem_object base;
 	struct drm_mm_node *mm;
@@ -254,7 +257,8 @@ static int ane_submit(struct drm_device *drm, void *data, struct drm_file *file)
 	 * access. Since this isn't page aligned, we represent the two as one
 	 * buffer and calculate the delimiter (where the weights would start).
 	 */
-	req.bar[1] = req.bar[0] + round_up(args->tsk_size, ANE_CMD_GRAN);
+	req.bar[KRN_BUF_BDX] =
+		req.bar[CMD_BUF_BDX] + round_up(args->tsk_size, ANE_CMD_GRAN);
 
 	bo = ane_bo_lookup(file, args->fifo_handle);
 	if (!bo)

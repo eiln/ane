@@ -217,9 +217,9 @@ static int ane_bo_free(struct drm_device *drm, void *data,
 	struct ane_bo *bo = bo_lookup(file, args->handle);
 	if (args->pad || !bo)
 		return -EINVAL;
+	drm_gem_handle_delete(file, args->handle);
 	ane_iommu_unmap_pages(ane, bo);
 	drm_gem_put_pages(&bo->base, bo->pages, true, true);
-	drm_gem_handle_delete(file, args->handle);
 	drm_gem_object_release(&bo->base);
 	kfree(bo);
 	return 0;

@@ -157,8 +157,8 @@ static int ane_bo_init(struct drm_device *drm, void *data,
 {
 	struct ane_device *ane = drm->dev_private;
 	struct drm_ane_bo_init *args = data;
-	struct drm_gem_object *gem = NULL;
-	struct ane_bo *bo = NULL;
+	struct drm_gem_object *gem;
+	struct ane_bo *bo;
 	int err;
 
 	if (args->pad)
@@ -229,7 +229,7 @@ static int ane_submit(struct drm_device *drm, void *data, struct drm_file *file)
 {
 	struct ane_device *ane = drm->dev_private;
 	struct drm_ane_submit *args = data;
-	struct ane_bo *bo = NULL;
+	struct ane_bo *bo;
 	int err;
 
 	struct ane_request req;
@@ -343,8 +343,8 @@ static long ane_drm_unlocked_ioctl(struct file *file, unsigned int cmd,
 
 static int ane_drm_mmap(struct file *file, struct vm_area_struct *vma)
 {
-	struct drm_gem_object *gem = NULL;
-	struct ane_bo *bo = NULL;
+	struct drm_gem_object *gem;
+	struct ane_bo *bo;
 	int err;
 
 	err = drm_gem_mmap(file, vma);

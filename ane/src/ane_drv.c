@@ -32,6 +32,28 @@ struct ane_bo {
 
 #define to_bo(gem) (container_of(gem, struct ane_bo, base))
 
+static struct ane_bo *bo_lookup(struct drm_file *file, u32 handle)
+{
+	struct drm_gem_object *gem = drm_gem_object_lookup(file, handle);
+	if (!gem)
+		return NULL;
+	return to_bo(gem);
+}
+
+static void ane_iommu_invalidate_tlb(struct ane_device *ane)
+{
+	mutex_lock(&ane->iommu_lock);
+
+	iommu_flush_iotlb_all(ane->domain);
+
+	writel(0x1, ane->dart1 + ane->hw->dart.sel);
+	writel(ane->hw->dart.inv, ane->dart1 + ane->hw->dart.cmd);
+	writel(0x1, ane->dart2 + ane->hw->dart.sel);
+	writel(ane->hw->dart.inv, ane->dart2 + ane->hw->dart.cmd);
+
+	mutex_unlock(&ane->iommu_lock);
+}
+
 static int ane_iommu_map_pages(struct ane_device *ane, struct ane_bo *bo)
 {
 	int err;
@@ -84,20 +106,6 @@ unlock:
 	return err;
 }
 
-static void ane_iommu_invalidate_tlb(struct ane_device *ane)
-{
-	mutex_lock(&ane->iommu_lock);
-
-	iommu_flush_iotlb_all(ane->domain);
-
-	writel(0x1, ane->dart1 + ane->hw->dart.sel);
-	writel(ane->hw->dart.inv, ane->dart1 + ane->hw->dart.cmd);
-	writel(0x1, ane->dart2 + ane->hw->dart.sel);
-	writel(ane->hw->dart.inv, ane->dart2 + ane->hw->dart.cmd);
-
-	mutex_unlock(&ane->iommu_lock);
-}
-
 static void ane_iommu_unmap_pages(struct ane_device *ane, struct ane_bo *bo)
 {
 	if (!bo->mm)
@@ -115,17 +123,6 @@ static void ane_iommu_unmap_pages(struct ane_device *ane, struct ane_bo *bo)
 
 	/* Conservatively invalidate after every unmap batch */
 	ane_iommu_invalidate_tlb(ane);
-}
-
-static struct ane_bo *ane_bo_lookup(struct drm_file *file, u32 handle)
-{
-	struct drm_gem_object *gem;
-
-	gem = drm_gem_object_lookup(file, handle);
-	if (!gem)
-		return NULL;
-
-	return to_bo(gem);
 }
 
 static vm_fault_t ane_gem_vm_fault(struct vm_fault *vmf)
@@ -217,7 +214,7 @@ static int ane_bo_free(struct drm_device *drm, void *data,
 {
 	struct ane_device *ane = drm->dev_private;
 	struct drm_ane_bo_free *args = data;
-	struct ane_bo *bo = ane_bo_lookup(file, args->handle);
+	struct ane_bo *bo = bo_lookup(file, args->handle);
 	if (args->pad || !bo)
 		return -EINVAL;
 	ane_iommu_unmap_pages(ane, bo);
@@ -251,7 +248,7 @@ static int ane_submit(struct drm_device *drm, void *data, struct drm_file *file)
 
 	for (int bdx = 0; bdx < ANE_TILE_COUNT; bdx++) {
 		if (args->handles[bdx]) {
-			bo = ane_bo_lookup(file, args->handles[bdx]);
+			bo = bo_lookup(file, args->handles[bdx]);
 			if (!bo || !bo->iova ||
 			    ((bdx == CMD_BUF_BDX) &&
 			     (args->tsk_size >= (bo->npages << ane->shift))))
@@ -268,7 +265,7 @@ static int ane_submit(struct drm_device *drm, void *data, struct drm_file *file)
 	req.bar[KRN_BUF_BDX] =
 		req.bar[CMD_BUF_BDX] + round_up(args->tsk_size, ANE_CMD_GRAN);
 
-	bo = ane_bo_lookup(file, args->fifo_handle);
+	bo = bo_lookup(file, args->fifo_handle);
 	if (!bo)
 		return -EINVAL;
 	req.fifo_addr = lower_32_bits(bo->iova);

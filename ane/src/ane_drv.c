@@ -252,8 +252,9 @@ static int ane_submit(struct drm_device *drm, void *data, struct drm_file *file)
 	for (int bdx = 0; bdx < ANE_TILE_COUNT; bdx++) {
 		if (args->handles[bdx]) {
 			bo = ane_bo_lookup(file, args->handles[bdx]);
-			if (!bo || (!bdx && (args->tsk_size >=
-					     (bo->npages << ane->shift))))
+			if (!bo || !bo->iova ||
+			    ((bdx == CMD_BUF_BDX) &&
+			     (args->tsk_size >= (bo->npages << ane->shift))))
 				return -EINVAL;
 			req.bar[bdx] = lower_32_bits(bo->iova);
 		}

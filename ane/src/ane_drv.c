@@ -500,26 +500,26 @@ static int ane_attach_genpd(struct ane_device *ane)
 
 static int ane_platform_probe(struct platform_device *pdev)
 {
+	struct device *dev = &pdev->dev;
 	struct ane_device *ane;
 	struct drm_device *drm;
 	struct resource *res;
 	int err;
 
-	ane = devm_drm_dev_alloc(&pdev->dev, &ane_drm_driver, struct ane_device,
-				 drm);
+	ane = devm_drm_dev_alloc(dev, &ane_drm_driver, struct ane_device, drm);
 	if (IS_ERR(ane))
 		return PTR_ERR(ane);
 
 	platform_set_drvdata(pdev, ane);
-	ane->dev = &pdev->dev;
-	ane->hw = of_device_get_match_data(ane->dev);
+	ane->dev = dev;
+	ane->hw = of_device_get_match_data(dev);
 
 	drm = &ane->drm;
 	drm->dev_private = ane;
 
 	err = ane_attach_genpd(ane);
 	if (err < 0) {
-		dev_err(ane->dev, "failed to attatch power domains\n");
+		dev_err(dev, "failed to attatch power domains\n");
 		return err;
 	}
 
@@ -561,7 +561,7 @@ static int ane_platform_probe(struct platform_device *pdev)
 	}
 
 	/* Simply ioremap since it's a shared register zone */
-	ane->dart0 = devm_ioremap(ane->dev, res->start, resource_size(res));
+	ane->dart0 = devm_ioremap(dev, res->start, resource_size(res));
 	if (IS_ERR(ane->dart0)) {
 		err = PTR_ERR(ane->dart0);
 		goto detach_genpd;
@@ -577,15 +577,15 @@ static int ane_platform_probe(struct platform_device *pdev)
 	ane_hw_reset(ane);
 
 	/* Measured 3sec on macos, but 1sec seems more stable */
-	pm_runtime_set_autosuspend_delay(ane->dev, 1000);
-	pm_runtime_use_autosuspend(ane->dev);
+	pm_runtime_set_autosuspend_delay(dev, 1000);
+	pm_runtime_use_autosuspend(dev);
 
-	pm_runtime_get_noresume(ane->dev);
-	pm_runtime_set_active(ane->dev);
-	pm_runtime_enable(ane->dev);
+	pm_runtime_get_noresume(dev);
+	pm_runtime_set_active(dev);
+	pm_runtime_enable(dev);
 
-	pm_runtime_mark_last_busy(ane->dev);
-	pm_runtime_put_autosuspend(ane->dev);
+	pm_runtime_mark_last_busy(dev);
+	pm_runtime_put_autosuspend(dev);
 
 	err = drm_dev_register(drm, 0);
 	if (err < 0)
@@ -596,8 +596,8 @@ static int ane_platform_probe(struct platform_device *pdev)
 	return 0;
 
 disable_pm:
-	pm_runtime_disable(ane->dev);
-	pm_runtime_dont_use_autosuspend(ane->dev);
+	pm_runtime_disable(dev);
+	pm_runtime_dont_use_autosuspend(dev);
 	ane_iommu_domain_free(ane);
 detach_genpd:
 	ane_detach_genpd(ane);

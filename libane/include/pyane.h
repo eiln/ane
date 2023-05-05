@@ -56,7 +56,7 @@ int pyane_read(struct ane_nn *nn, void *x0, void *x1, void *x2, void *x3,
 				 x16, x17, x18, x19, x20, x21, x22, x23,
 				 x24, x25, x26, x27, x28, x29, x30, x31 };
 	for (int i = 0; i < nn->model->output_count; i++) {
-		__ane_read(nn, xs[i], i, 1);
+		ane_read_chan(nn, xs[i], i);
 	}
 	return 0;
 }

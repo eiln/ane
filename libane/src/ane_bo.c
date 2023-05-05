@@ -28,7 +28,8 @@ static inline int bo_mmap(struct ane_device *ane, struct ane_bo *bo)
 		       bo->offset);
 
 	if (bo->map == MAP_FAILED) {
-		fprintf(stderr, "LIBANE: failed to mmap bo\n");
+		bo->map = NULL;
+		ane_err("failed to mmap bo\n");
 		return -EINVAL;
 	}
 
@@ -44,14 +45,14 @@ int ane_bo_init(struct ane_device *ane, struct ane_bo *bo)
 
 	err = bo_init(ane, bo);
 	if (err < 0) {
-		fprintf(stderr, "LIBANE: bo_init failed with 0x%x\n", err);
+		ane_err("bo_init failed with 0x%x\n", err);
 		return err;
 	}
 
 	err = bo_mmap(ane, bo);
 	if (err < 0) {
 		bo_free(ane, bo);
-		fprintf(stderr, "LIBANE: bo_mmap failed with 0x%x\n", err);
+		ane_err("bo_mmap failed with 0x%x\n", err);
 		return err;
 	}
 

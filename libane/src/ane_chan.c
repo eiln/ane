@@ -10,7 +10,7 @@
 static inline void set_nid(void *td, int nid)
 {
 	uint32_t hdr0 = *(uint32_t *)td;
-	hdr0 = (hdr0 & 0xf00ffff) | ((nid & 0xff) << 16);
+	hdr0 = (hdr0 & 0xf00ffff) | ((nid & 0xff) << 16); /* trust me bro */
 	memcpy(td, &hdr0, sizeof(uint32_t));
 }
 
@@ -41,7 +41,10 @@ void ane_chan_free(struct ane_device *ane, struct ane_nn *nn)
 int ane_chan_init(struct ane_device *ane, struct ane_nn *nn)
 {
 	const struct anec *anec = to_anec(nn);
+	struct ane_bo *bo;
+	int err;
 
+	/* creating bar index masks to easily iterate over */
 	int ic = 0, oc = 0;
 	for (int bdx = 0; bdx < ANE_TILE_COUNT; bdx++) {
 		if (anec->types[bdx] == ANE_TILE_SRC) {
@@ -53,22 +56,25 @@ int ane_chan_init(struct ane_device *ane, struct ane_nn *nn)
 		}
 	}
 
-	if (ic != input_count(nn) || oc != output_count(nn)) {
-		fprintf(stderr, "LIBANE: invalid src/dst setup\n");
+	if (ic != src_count(nn) || oc != dst_count(nn)) {
+		ane_err("invalid src/dst setup\n");
 		return -EINVAL;
 	}
 
 	for (int bdx = 0; bdx < ANE_TILE_COUNT; bdx++) {
 		if (anec->tiles[bdx]) {
-			struct ane_bo *bo = &nn->chans[bdx];
+			bo = &nn->chans[bdx];
 			bo->size = tile_size(nn, bdx);
-			if (ane_bo_init(ane, bo) < 0)
+			err = ane_bo_init(ane, bo);
+			if (err < 0)
 				goto error;
 		}
 	}
 
-	nn->fifo_chan.size = tile_align(FIFO_WIDTH * 2);
-	if (ane_bo_init(ane, &nn->fifo_chan) < 0)
+	bo = &nn->fifo_chan;
+	bo->size = tile_align(FIFO_WIDTH * 2);
+	err = ane_bo_init(ane, bo);
+	if (err < 0)
 		goto error;
 
 	load_anec(nn);
@@ -76,7 +82,7 @@ int ane_chan_init(struct ane_device *ane, struct ane_nn *nn)
 	return 0;
 
 error:
-	fprintf(stderr, "LIBANE: out of memory for chans\n");
+	ane_err("failed to init memory-mapped channels\n");
 	ane_chan_free(ane, nn);
-	return -ENOMEM;
+	return err;
 }

@@ -13,10 +13,10 @@ extern "C" {
 struct ane_nn *ane_init(const struct ane_model *model);
 void ane_free(struct ane_nn *nn);
 int ane_exec(struct ane_nn *nn);
-int __ane_send(struct ane_nn *nn, void *from, const int idx, const int raw);
-int __ane_read(struct ane_nn *nn, void *to, const int idx, const int raw);
-#define ane_send(nn, from, idx) (__ane_send(nn, from, idx, 0))
-#define ane_read(nn, to, idx)	(__ane_read(nn, to, idx, 0))
+void ane_send(struct ane_nn *nn, void *from, const int idx);
+void ane_read(struct ane_nn *nn, void *to, const int idx);
+void ane_send_chan(struct ane_nn *nn, void *from, const int idx);
+void ane_read_chan(struct ane_nn *nn, void *to, const int idx);
 
 #if defined(__cplusplus)
 }

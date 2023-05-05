@@ -3,33 +3,29 @@
 
 #include <drm.h>
 #include <fcntl.h>
-#include <stdlib.h> // nn malloc
+#include <stdlib.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 
 #include "ane_chan.h"
 #include "ane_priv.h"
-#include "ane_tile.h"
 
 #define ANE_SYSFS_PATH "/dev/dri/renderD129"
 
-static int ane_open(struct ane_nn *nn)
+static inline int ane_open(struct ane_nn *nn)
 {
-	struct ane_device *ane = &nn->ane;
-
 	int fd = open(ANE_SYSFS_PATH, O_RDWR, S_IRUSR | S_IWUSR);
 	if (fd < 0) {
-		fprintf(stderr, "LIBANE: failed to open sysfs %s\n",
-			ANE_SYSFS_PATH);
+		ane_err("failed to open device sysfs %s\n", ANE_SYSFS_PATH);
 		return -ENODEV;
 	}
 
-	ane->fd = fd;
+	nn->ane.fd = fd;
 
 	return 0;
 }
 
-static void ane_close(struct ane_nn *nn)
+static inline void ane_close(struct ane_nn *nn)
 {
 	close(nn->ane.fd);
 }
@@ -38,11 +34,14 @@ struct ane_nn *ane_init(const struct ane_model *model)
 {
 	int err;
 
+	/* we malloc once for the nn struct */
 	struct ane_nn *nn = malloc(sizeof(struct ane_nn));
-	if (!nn)
-		return NULL;
-	memset(nn, 0, sizeof(struct ane_nn));
+	if (!nn) {
+		ane_err("out of memory to alloc nn struct\n");
+		goto exit;
+	}
 
+	memset(nn, 0, sizeof(struct ane_nn));
 	nn->model = model;
 
 	err = ane_open(nn);
@@ -51,12 +50,11 @@ struct ane_nn *ane_init(const struct ane_model *model)
 
 	err = ane_chan_init(&nn->ane, nn);
 	if (err) {
-		fprintf(stderr, "LIBANE: ane_chan_init failed with 0x%x\n",
-			err);
+		ane_err("ane_chan_init failed with 0x%x\n", err);
 		goto close;
 	}
 
-	printf("LIBANE: initialized nn %p\n", (void *)nn);
+	ane_log("initialized nn %p\n", (void *)nn);
 
 	return nn;
 
@@ -64,12 +62,13 @@ close:
 	ane_close(nn);
 free:
 	free(nn);
+exit:
 	return NULL;
 }
 
 void ane_free(struct ane_nn *nn)
 {
-	printf("LIBANE: freeing nn %p\n", (void *)nn);
+	ane_log("freeing nn %p\n", (void *)nn);
 	ane_chan_free(&nn->ane, nn);
 	ane_close(nn);
 	free(nn);
@@ -94,20 +93,4 @@ int ane_exec(struct ane_nn *nn)
 	args.fifo_handle = nn->fifo_chan.handle;
 
 	return ioctl(nn->ane.fd, DRM_IOCTL_ANE_SUBMIT, &args);
-}
-
-int __ane_send(struct ane_nn *nn, void *from, const int idx, const int raw)
-{
-	if (idx >= input_count(nn))
-		return -EINVAL;
-	ane_tile_send(nn, from, idx, raw);
-	return 0;
-}
-
-int __ane_read(struct ane_nn *nn, void *to, const int idx, const int raw)
-{
-	if (idx >= output_count(nn))
-		return -EINVAL;
-	ane_tile_read(nn, to, idx, raw);
-	return 0;
 }

@@ -16,12 +16,24 @@
 #define TILE_SHIFT	   0xEUL
 #define TILE_SIZE	   0x4000UL
 
-#define to_anec(nn)	   (&nn->model->anec)
-#define input_count(nn)	   (nn->model->input_count)
-#define output_count(nn)   (nn->model->output_count)
-
 #define tile_shift(x)	   (((uint64_t)(x)) << TILE_SHIFT)
 #define tile_align(x)	   ((((uint64_t)(x)) + TILE_SIZE - 1) & -TILE_SIZE)
 #define tile_size(nn, bdx) (tile_shift(to_anec(nn)->tiles[bdx]))
+
+#define to_anec(nn)	   (&nn->model->anec)
+#define src_count(nn)	   (nn->model->input_count)
+#define dst_count(nn)	   (nn->model->output_count)
+
+#ifndef LIBANE_STFU_LOG
+#define ane_log(a, ...) printf("LIBANE: LOG: " a, ##__VA_ARGS__)
+#else
+#define ane_log(...) (0)
+#endif
+
+#ifndef LIBANE_STFU_ERR
+#define ane_err(a, ...) fprintf(stderr, "LIBANE: ERR: " a, ##__VA_ARGS__)
+#else
+#define ane_err(...) (0)
+#endif
 
 #endif /* __ANE_PRIV_H__ */

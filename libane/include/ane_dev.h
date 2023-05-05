@@ -4,6 +4,10 @@
 #ifndef __ANE_DEV_H__
 #define __ANE_DEV_H__
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 #include <stdint.h>
 
 #define TILE_COUNT   0x20
@@ -54,5 +58,9 @@ struct ane_nn {
 	int src_bdx[TILE_COUNT];
 	int dst_bdx[TILE_COUNT];
 };
+
+#if defined(__cplusplus)
+}
+#endif
 
 #endif /* __ANE_DEV_H__ */

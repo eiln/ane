@@ -90,20 +90,22 @@ static inline void tile_read(struct ane_nn *nn, void *to, const int idx)
 		   model->nchw[bdx][4], model->nchw[bdx][5]);
 }
 
-void ane_tile_send(struct ane_nn *nn, void *from, const int idx, const int raw)
+void ane_send(struct ane_nn *nn, void *from, const int idx)
 {
-	if (!raw) {
-		tile_send(nn, from, idx);
-	} else {
-		chan_send(nn, from, idx);
-	}
+	tile_send(nn, from, idx);
 }
 
-void ane_tile_read(struct ane_nn *nn, void *to, const int idx, const int raw)
+void ane_read(struct ane_nn *nn, void *to, const int idx)
 {
-	if (!raw) {
-		tile_read(nn, to, idx);
-	} else {
-		chan_read(nn, to, idx);
-	}
+	tile_read(nn, to, idx);
+}
+
+void ane_send_chan(struct ane_nn *nn, void *from, const int idx)
+{
+	chan_send(nn, from, idx);
+}
+
+void ane_read_chan(struct ane_nn *nn, void *to, const int idx)
+{
+	chan_read(nn, to, idx);
 }

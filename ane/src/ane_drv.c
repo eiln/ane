@@ -235,7 +235,7 @@ static int ane_submit(struct drm_device *drm, void *data, struct drm_file *file)
 	struct ane_request req;
 	memset(&req, 0, sizeof(req));
 
-	if (!args->tsk_size || !args->td_count || !args->td_size ||
+	if (args->pad || !args->tsk_size || !args->td_count || !args->td_size ||
 	    !args->handles[CMD_BUF_BDX] || args->handles[KRN_BUF_BDX] ||
 	    !args->fifo_handle) {
 		return -EINVAL;

@@ -35,6 +35,7 @@ struct drm_ane_submit {
 	__u32 td_size;
 	__u32 handles[ANE_TILE_COUNT];
 	__u32 fifo_handle;
+	__u32 pad;
 };
 
 #define DRM_IOCTL_ANE_BO_INIT \

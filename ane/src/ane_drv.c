@@ -655,6 +655,7 @@ static const struct ane_hw ane_hw_t8020 = {
 
 static const struct of_device_id ane_of_match[] = {
 	{ .compatible = "apple,t8103-ane", .data = &ane_hw_t8020 },
+	{ .compatible = "apple,t6000-ane", .data = &ane_hw_t8020 },
 	{}
 };
 

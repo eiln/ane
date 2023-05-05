@@ -432,9 +432,9 @@ static void ane_iommu_domain_free(struct ane_device *ane)
 static void ane_iommu_remap_ttbr(struct ane_device *ane)
 {
 	/* L2 DMA fails without */
-	writel_relaxed(readl_relaxed(ane->ttbr),
+	writel_relaxed(readl_relaxed(ane->dart0 + ane->hw->dart.ttbr),
 		       ane->dart1 + ane->hw->dart.ttbr);
-	writel_relaxed(readl_relaxed(ane->ttbr),
+	writel_relaxed(readl_relaxed(ane->dart0 + ane->hw->dart.ttbr),
 		       ane->dart2 + ane->hw->dart.ttbr);
 }
 
@@ -502,6 +502,7 @@ static int ane_platform_probe(struct platform_device *pdev)
 {
 	struct ane_device *ane;
 	struct drm_device *drm;
+	struct resource *res;
 	int err;
 
 	ane = devm_drm_dev_alloc(&pdev->dev, &ane_drm_driver, struct ane_device,
@@ -553,10 +554,16 @@ static int ane_platform_probe(struct platform_device *pdev)
 		goto detach_genpd;
 	}
 
-	ane->ttbr = devm_ioremap(
-		ane->dev, ane->hw->dart.base + ane->hw->dart.ttbr, sizeof(u32));
-	if (IS_ERR(ane->ttbr)) {
-		err = PTR_ERR(ane->ttbr);
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dart0");
+	if (!res) {
+		err = -ENODEV;
+		goto detach_genpd;
+	}
+
+	/* Simply ioremap since it's a shared register zone */
+	ane->dart0 = devm_ioremap(ane->dev, res->start, resource_size(res));
+	if (IS_ERR(ane->dart0)) {
+		err = PTR_ERR(ane->dart0);
 		goto detach_genpd;
 	}
 
@@ -635,65 +642,10 @@ static const struct dev_pm_ops ane_pm_ops = {
 #define DART_T8020_TTBR			     0x200
 #define DART_T8020_STREAM_COMMAND_INVALIDATE BIT(20)
 
-static const struct ane_hw ane_hw_t8103_ane = {
-	.base = 0x26a000000,
-	.ane_type = 64,
-	.ane_subtype = 0,
-	.ane_id = 0,
-	.die_id = 0,
-	.die_ane_id = 0,
+static const struct ane_hw ane_hw_t8020 = {
 	.dart = {
-		.base = 0x26b800000,
-		.dart1 = 0x26b810000,
-		.dart2 = 0x26b820000,
-		.dapf = 0x26b804000,
 		.vm_base = 0x4000,
 		.vm_size = 0xe0000000,
-		.page_size = 0x4000,
-		.ttbr = DART_T8020_TTBR,
-		.sel = DART_T8020_STREAM_SELECT,
-		.cmd = DART_T8020_STREAM_COMMAND,
-		.inv = DART_T8020_STREAM_COMMAND_INVALIDATE,
-	},
-};
-
-static const struct ane_hw ane_hw_t6000_ane0 = {
-	.base = 0x284000000,
-	.ane_type = 96,
-	.ane_subtype = 0,
-	.ane_id = 0,
-	.die_id = 0,
-	.die_ane_id = 0,
-	.dart = {
-		.base = 0x285800000,
-		.dart1 = 0x285810000,
-		.dart2 = 0x285820000,
-		.dapf = 0x285804000,
-		.vm_base = 0x4000,
-		.vm_size = 0xe0000000,
-		.page_size = 0x4000,
-		.ttbr = DART_T8020_TTBR,
-		.sel = DART_T8020_STREAM_SELECT,
-		.cmd = DART_T8020_STREAM_COMMAND,
-		.inv = DART_T8020_STREAM_COMMAND_INVALIDATE,
-	},
-};
-
-static const struct ane_hw ane_hw_t6000_ane2 = {
-	.base = 0x2284000000,
-	.ane_type = 96,
-	.ane_subtype = 2,
-	.ane_id = 2,
-	.die_id = 1,
-	.die_ane_id = 0,
-	.dart = {
-		.base = 0x2285800000,
-		.dart1 = 0x2285810000,
-		.dart2 = 0x2285820000,
-		.dapf = 0x2285804000,
-		.vm_base = 0x4000,
-		.vm_size = 0xe0000000,
-		.page_size = 0x4000,
 		.ttbr = DART_T8020_TTBR,
 		.sel = DART_T8020_STREAM_SELECT,
 		.cmd = DART_T8020_STREAM_COMMAND,
@@ -702,7 +654,7 @@ static const struct ane_hw ane_hw_t6000_ane2 = {
 };
 
 static const struct of_device_id ane_of_match[] = {
-	{ .compatible = "apple,t8103-ane", .data = &ane_hw_t8103_ane },
+	{ .compatible = "apple,t8103-ane", .data = &ane_hw_t8020 },
 	{}
 };
 

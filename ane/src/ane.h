@@ -19,9 +19,9 @@ struct ane_device {
 	int pd_count;
 
 	void __iomem *engine; /* Engine MMIO range */
+	void __iomem *dart0;
 	void __iomem *dart1; /* Auxiliary IOMMU range for DMA */
 	void __iomem *dart2; /* Auxiliary IOMMU range for DMA */
-	void __iomem *ttbr;
 
 	struct drm_mm mm; /* IOMMU space allocator */
 	struct iommu_domain *domain;
@@ -35,21 +35,9 @@ struct ane_device {
 };
 
 struct ane_hw {
-	u64 base;
-	u32 ane_type;
-	u32 ane_subtype;
-	u32 ane_id;
-	u32 die_id;
-	u32 die_ane_id;
-
 	struct {
-		u64 base; /* Main DART base address */
-		u64 dart1; /* Aux DART base address */
-		u64 dart2; /* Aux DART base address */
-		u64 dapf;
 		u64 vm_base;
 		u64 vm_size;
-		u32 page_size;
 		u32 ttbr; /* TTBR offset */
 		u32 sel; /* Stream select offset */
 		u32 cmd; /* Stream command offset */

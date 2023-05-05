@@ -438,12 +438,6 @@ static void ane_iommu_remap_ttbr(struct ane_device *ane)
 		       ane->dart2 + ane->hw->dart.ttbr);
 }
 
-static void ane_hw_reset(struct ane_device *ane)
-{
-	ane_iommu_remap_ttbr(ane);
-	ane_tm_enable(ane);
-}
-
 static void ane_detach_genpd(struct ane_device *ane)
 {
 	if (ane->pd_count <= 1)
@@ -574,7 +568,8 @@ static int ane_platform_probe(struct platform_device *pdev)
 	if (err < 0)
 		goto detach_genpd;
 
-	ane_hw_reset(ane);
+	ane_iommu_remap_ttbr(ane);
+	ane_tm_enable(ane);
 
 	/* Measured 3sec on macos, but 1sec seems more stable */
 	pm_runtime_set_autosuspend_delay(dev, 1000);
@@ -625,7 +620,8 @@ static int __maybe_unused ane_runtime_suspend(struct device *dev)
 static int __maybe_unused ane_runtime_resume(struct device *dev)
 {
 	struct ane_device *ane = dev_get_drvdata(dev);
-	ane_hw_reset(ane);
+	ane_iommu_remap_ttbr(ane);
+	ane_tm_enable(ane);
 	return 0;
 }
 

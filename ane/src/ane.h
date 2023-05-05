@@ -12,23 +12,23 @@
 struct ane_device {
 	struct drm_device drm;
 	struct device *dev;
-	const struct ane_hw *hw;
+	const struct ane_hw *hw; /* HW-specific data */
 
 	struct device **pd_dev; /* Engine/RPM power domains */
 	struct device_link **pd_link;
 	int pd_count;
 
-	void __iomem *engine; /* Engine MMIO range */
-	void __iomem *dart0;
-	void __iomem *dart1; /* Auxiliary IOMMU range for DMA */
-	void __iomem *dart2; /* Auxiliary IOMMU range for DMA */
+	void __iomem *engine; /* Engine MMIO */
+	void __iomem *dart0; /* Main IOMMU MMIO shared with IOMMU driver */
+	void __iomem *dart1; /* Auxiliary IOMMU for DMA */
+	void __iomem *dart2; /* Auxiliary IOMMU for DMA */
 
-	struct drm_mm mm; /* IOMMU space allocator */
+	struct drm_mm mm; /* IOMMU space (iova) allocator */
 	struct iommu_domain *domain;
-	unsigned long shift; /* IOMMU shift */
+	unsigned long shift; /* IOMMU page shift */
 
 	int irq;
-	int dart_irq;
+	int dart_irq; /* IOMMU IRQ shared with IOMMU driver */
 
 	struct mutex iommu_lock; /* Protects IOMMU space */
 	struct mutex engine_lock; /* Protects engine queue */

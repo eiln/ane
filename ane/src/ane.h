@@ -39,9 +39,9 @@ struct ane_hw {
 		u64 vm_base;
 		u64 vm_size;
 		u32 ttbr; /* TTBR offset */
-		u32 sel; /* Stream select offset */
-		u32 cmd; /* Stream command offset */
-		u32 inv; /* Stream command TLB invalidation bit */
+		u32 select; /* Stream select offset */
+		u32 command; /* Stream command offset */
+		u32 invalidate; /* Stream command TLB invalidation bit */
 	} dart;
 };
 

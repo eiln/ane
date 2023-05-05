@@ -46,10 +46,10 @@ static void ane_iommu_invalidate_tlb(struct ane_device *ane)
 
 	iommu_flush_iotlb_all(ane->domain);
 
-	writel(0x1, ane->dart1 + ane->hw->dart.sel);
-	writel(ane->hw->dart.inv, ane->dart1 + ane->hw->dart.cmd);
-	writel(0x1, ane->dart2 + ane->hw->dart.sel);
-	writel(ane->hw->dart.inv, ane->dart2 + ane->hw->dart.cmd);
+	writel(0x1, ane->dart1 + ane->hw->dart.select);
+	writel(ane->hw->dart.invalidate, ane->dart1 + ane->hw->dart.command);
+	writel(0x1, ane->dart2 + ane->hw->dart.select);
+	writel(ane->hw->dart.invalidate, ane->dart2 + ane->hw->dart.command);
 
 	mutex_unlock(&ane->iommu_lock);
 }
@@ -643,9 +643,9 @@ static const struct ane_hw ane_hw_t8020 = {
 		.vm_base = 0x4000,
 		.vm_size = 0xe0000000,
 		.ttbr = DART_T8020_TTBR,
-		.sel = DART_T8020_STREAM_SELECT,
-		.cmd = DART_T8020_STREAM_COMMAND,
-		.inv = DART_T8020_STREAM_COMMAND_INVALIDATE,
+		.select = DART_T8020_STREAM_SELECT,
+		.command = DART_T8020_STREAM_COMMAND,
+		.invalidate = DART_T8020_STREAM_COMMAND_INVALIDATE,
 	},
 };
 

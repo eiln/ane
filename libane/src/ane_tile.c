@@ -10,6 +10,7 @@
 	(memcpy(to, nn->chans[nn->dst_bdx[idx]].map, \
 		tile_size(nn, nn->dst_bdx[idx])))
 
+// clang-format off
 static inline void ane_tile(void *data, void *tile, const uint64_t N,
 			    const uint64_t C, const uint64_t H,
 			    const uint64_t W, const uint64_t P,
@@ -19,15 +20,12 @@ static inline void ane_tile(void *data, void *tile, const uint64_t N,
 	const uint64_t new_W = R / sizeof(uint16_t);
 	const uint64_t stride = W * sizeof(uint16_t);
 
-	uint16_t(*data_a)[N][C][H][W] = (uint16_t(*)[N][C][H][W])data;
-	uint16_t(*tile_a)[N][C][new_H][new_W] =
-		(uint16_t(*)[N][C][new_H][new_W])tile;
-
 	for (uint64_t n = 0; n < N; n++) {
 		for (uint64_t c = 0; c < C; c++) {
 			for (uint64_t h = 0; h < H; h++) {
-				memcpy((*tile_a)[n][c][h], (*data_a)[n][c][h],
-				       stride);
+				void *src = ((void *)(data)) + ((n*(C*H*W) + c*(H*W) + h*(W)) * sizeof(uint16_t));
+				void *dst = ((void *)(tile)) + ((n*(C*new_H*new_W) + c*(new_H*new_W) + h*(new_W)) * sizeof(uint16_t));
+				memcpy(dst, src, stride);
 			}
 		}
 	}
@@ -44,24 +42,21 @@ static inline void ane_untile(void *data, void *tile, const uint64_t N,
 	const uint64_t new_W = R / sizeof(uint16_t);
 	const uint64_t stride = W * sizeof(uint16_t);
 
-	uint16_t(*data_a)[N][C][H][W] = (uint16_t(*)[N][C][H][W])data;
-	uint16_t(*tile_a)[N][C][new_H][new_W] =
-		(uint16_t(*)[N][C][new_H][new_W])tile;
+	memset(data, 0, N * C * H * W * sizeof(uint16_t));
 
-	const uint64_t data_size = N * C * H * W * sizeof(uint16_t);
-	memset(data, 0, data_size);
-
-	for (uint64_t n = 0; n < N; n++) { // TODO; early exit on alignment
+	for (uint64_t n = 0; n < N; n++) {
 		for (uint64_t c = 0; c < C; c++) {
 			for (uint64_t h = 0; h < H; h++) {
-				memcpy((*data_a)[n][c][h], (*tile_a)[n][c][h],
-				       stride);
+				void *src = ((void *)(tile)) + ((n*(C*new_H*new_W) + c*(new_H*new_W) + h*(new_W)) * sizeof(uint16_t));
+				void *dst = ((void *)(data)) + ((n*(C*H*W) + c*(H*W) + h*(W)) * sizeof(uint16_t));
+				memcpy(dst, src, stride);
 			}
 		}
 	}
 
 	return;
 }
+// clang-format on
 
 static inline void tile_send(struct ane_nn *nn, void *from, const int idx)
 {

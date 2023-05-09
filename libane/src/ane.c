@@ -94,3 +94,15 @@ int ane_exec(struct ane_nn *nn)
 
 	return ioctl(nn->ane.fd, DRM_IOCTL_ANE_SUBMIT, &args);
 }
+
+void ane_send(struct ane_nn *nn, void *from, const int idx)
+{
+	const int bdx = nn->src_bdx[idx];
+	memcpy(nn->chans[bdx].map, from, tile_size(nn, bdx));
+}
+
+void ane_read(struct ane_nn *nn, void *to, const int idx)
+{
+	const int bdx = nn->dst_bdx[idx];
+	memcpy(to, nn->chans[bdx].map, tile_size(nn, bdx));
+}

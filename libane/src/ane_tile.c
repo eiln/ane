@@ -3,13 +3,6 @@
 
 #include "ane_priv.h"
 
-#define chan_send(nn, from, idx)                       \
-	(memcpy(nn->chans[nn->src_bdx[idx]].map, from, \
-		tile_size(nn, nn->src_bdx[idx])))
-#define chan_read(nn, to, idx)                       \
-	(memcpy(to, nn->chans[nn->dst_bdx[idx]].map, \
-		tile_size(nn, nn->dst_bdx[idx])))
-
 // clang-format off
 static inline void ane_tile(void *data, void *tile, const uint64_t N,
 			    const uint64_t C, const uint64_t H,
@@ -69,7 +62,7 @@ static inline void tile_send(struct ane_nn *nn, void *from, const int idx)
 	ane_tile(from, tile, model->nchw[bdx][0], model->nchw[bdx][1],
 		 model->nchw[bdx][2], model->nchw[bdx][3], model->nchw[bdx][4],
 		 model->nchw[bdx][5]);
-	chan_send(nn, tile, idx);
+	memcpy(nn->chans[bdx].map, tile, tile_size(nn, bdx));
 }
 
 static inline void tile_read(struct ane_nn *nn, void *to, const int idx)
@@ -78,29 +71,19 @@ static inline void tile_read(struct ane_nn *nn, void *to, const int idx)
 	const int bdx = nn->dst_bdx[idx];
 
 	uint16_t tile[tile_size(nn, bdx) / sizeof(uint16_t)];
-	chan_read(nn, tile, idx);
+	memcpy(tile, nn->chans[bdx].map, tile_size(nn, bdx));
 
 	ane_untile(to, tile, model->nchw[bdx][0], model->nchw[bdx][1],
 		   model->nchw[bdx][2], model->nchw[bdx][3],
 		   model->nchw[bdx][4], model->nchw[bdx][5]);
 }
 
-void ane_send(struct ane_nn *nn, void *from, const int idx)
+void ane_tile_send(struct ane_nn *nn, void *from, const int idx)
 {
 	tile_send(nn, from, idx);
 }
 
-void ane_read(struct ane_nn *nn, void *to, const int idx)
+void ane_tile_read(struct ane_nn *nn, void *to, const int idx)
 {
 	tile_read(nn, to, idx);
-}
-
-void ane_send_chan(struct ane_nn *nn, void *from, const int idx)
-{
-	chan_send(nn, from, idx);
-}
-
-void ane_read_chan(struct ane_nn *nn, void *to, const int idx)
-{
-	chan_read(nn, to, idx);
 }

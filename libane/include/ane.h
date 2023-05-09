@@ -15,8 +15,8 @@ void ane_free(struct ane_nn *nn);
 int ane_exec(struct ane_nn *nn);
 void ane_send(struct ane_nn *nn, void *from, const int idx);
 void ane_read(struct ane_nn *nn, void *to, const int idx);
-void ane_send_chan(struct ane_nn *nn, void *from, const int idx);
-void ane_read_chan(struct ane_nn *nn, void *to, const int idx);
+void ane_tile_send(struct ane_nn *nn, void *from, const int idx);
+void ane_tile_read(struct ane_nn *nn, void *to, const int idx);
 
 #if defined(__cplusplus)
 }

@@ -14,7 +14,7 @@
 
 static inline int ane_open(struct ane_nn *nn)
 {
-	int fd = open(ANE_SYSFS_PATH, O_RDWR, S_IRUSR | S_IWUSR);
+	int fd = open(ANE_SYSFS_PATH, O_RDWR | O_CLOEXEC, S_IRUSR | S_IWUSR);
 	if (fd < 0) {
 		ane_err("failed to open device sysfs %s\n", ANE_SYSFS_PATH);
 		return -ENODEV;

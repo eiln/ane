@@ -3,11 +3,11 @@
 
 #include <drm.h>
 #include <fcntl.h>
-#include <stdlib.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 
 #include "ane_chan.h"
+#include "ane_mem.h"
 #include "ane_priv.h"
 
 #define ANE_SYSFS_PATH "/dev/dri/renderD129"
@@ -34,14 +34,11 @@ struct ane_nn *ane_init(const struct ane_model *model)
 {
 	int err;
 
-	/* we malloc once for the nn struct */
-	struct ane_nn *nn = malloc(sizeof(struct ane_nn));
+	struct ane_nn *nn = ane_zmalloc(sizeof(struct ane_nn));
 	if (!nn) {
-		ane_err("out of memory to alloc nn struct\n");
 		goto exit;
 	}
 
-	memset(nn, 0, sizeof(struct ane_nn));
 	nn->model = model;
 
 	err = ane_open(nn);

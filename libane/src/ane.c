@@ -103,3 +103,23 @@ void __ane_read(struct ane_nn *nn, void *to, const int idx)
 	const int bdx = nn->dst_bdx[idx];
 	memcpy(to, nn->chans[bdx].map, tile_size(nn, bdx));
 }
+
+void *__ane_src_chan(struct ane_nn *nn, const int idx)
+{
+	return nn->chans[nn->src_bdx[idx]].map;
+}
+
+void *__ane_dst_chan(struct ane_nn *nn, const int idx)
+{
+	return nn->chans[nn->dst_bdx[idx]].map;
+}
+
+uint64_t __ane_src_size(struct ane_nn *nn, const int idx)
+{
+	return tile_size(nn, nn->src_bdx[idx]);
+}
+
+uint64_t __ane_dst_size(struct ane_nn *nn, const int idx)
+{
+	return tile_size(nn, nn->dst_bdx[idx]);
+}

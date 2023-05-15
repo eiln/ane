@@ -58,6 +58,36 @@ void __ane_tile_read(struct ane_nn *nn, void *to, const int idx);
 		__ane_tile_read(nn, to, idx);    \
 	})
 
+void *__ane_src_chan(struct ane_nn *nn, const int idx);
+void *__ane_dst_chan(struct ane_nn *nn, const int idx);
+
+uint64_t __ane_src_size(struct ane_nn *nn, const int idx);
+uint64_t __ane_dst_size(struct ane_nn *nn, const int idx);
+
+#define ane_src_chan(nn, idx)                    \
+	({                                       \
+		STATIC_ASSERT(idx < TILE_COUNT); \
+		__ane_src_chan(nn, idx);         \
+	})
+
+#define ane_dst_chan(nn, idx)                    \
+	({                                       \
+		STATIC_ASSERT(idx < TILE_COUNT); \
+		__ane_dst_chan(nn, idx);         \
+	})
+
+#define ane_src_size(nn, idx)                    \
+	({                                       \
+		STATIC_ASSERT(idx < TILE_COUNT); \
+		__ane_src_size(nn, idx);         \
+	})
+
+#define ane_dst_size(nn, idx)                    \
+	({                                       \
+		STATIC_ASSERT(idx < TILE_COUNT); \
+		__ane_dst_size(nn, idx);         \
+	})
+
 #if defined(__cplusplus)
 }
 #endif

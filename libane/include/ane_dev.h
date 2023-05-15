@@ -59,6 +59,11 @@ struct ane_nn {
 	int dst_bdx[TILE_COUNT];
 };
 
+/* #define LIBANE_STFU_LOG */
+/* #define LIBANE_STFU_ERR */
+/* #define LIBANE_STRICT_INDEX */
+/* #define LIBANE_NO_STATIC_ASSERT */
+
 #if defined(__cplusplus)
 }
 #endif

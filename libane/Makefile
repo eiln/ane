@@ -5,6 +5,9 @@ CFLAGS = -I. -I./include -Wall -Werror -Wextra \
 	-Wdeclaration-after-statement \
 	-O2 -std=gnu99
 
+CDEFS = -DANE_DEVNODE=\"/dev/dri/renderD129\"
+CFLAGS += $(CDEFS)
+
 UAPI_PATH = -I/home/eileen/ane/ane/src/include
 LIBS = -I/usr/include/libdrm $(UAPI_PATH)
 
@@ -14,6 +17,7 @@ SRC_DIR = src
 OBJECTS = $(BUILD_DIR)/ane.o \
 	  $(BUILD_DIR)/ane_bo.o \
 	  $(BUILD_DIR)/ane_chan.o \
+	  $(BUILD_DIR)/ane_device.o \
 	  $(BUILD_DIR)/ane_tile.o
 
 .PHONY: libane install uninstall clean

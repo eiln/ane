@@ -2,11 +2,10 @@
 /* Copyright 2022 Eileen Yoon <eyn@gmx.com> */
 
 #include <drm.h>
-#include <fcntl.h>
 #include <sys/ioctl.h>
-#include <unistd.h>
 
 #include "ane_chan.h"
+#include "ane_device.h"
 #include "ane_mem.h"
 #include "ane_priv.h"
 
@@ -40,64 +39,54 @@
 	} while (0)
 #endif /* LIBANE_STRICT_INDEX */
 
-#define ANE_SYSFS_PATH "/dev/dri/renderD129"
-
-static inline int ane_open(struct ane_nn *nn)
-{
-	int fd = open(ANE_SYSFS_PATH, O_RDWR | O_CLOEXEC, S_IRUSR | S_IWUSR);
-	if (fd < 0) {
-		ane_err("failed to open device sysfs %s\n", ANE_SYSFS_PATH);
-		return -ENODEV;
-	}
-
-	nn->ane.fd = fd;
-
-	return 0;
-}
-
-static inline void ane_close(struct ane_nn *nn)
-{
-	close(nn->ane.fd);
-}
-
-struct ane_nn *ane_init(const struct ane_model *model)
+struct ane_nn *__ane_init(const struct ane_model *model, int fd)
 {
 	int err;
 
 	struct ane_nn *nn = ane_zmalloc(sizeof(struct ane_nn));
 	if (!nn) {
-		goto exit;
+		ane_err("failed to alloc space for nn struct\n");
+		return NULL;
 	}
 
 	nn->model = model;
-
-	err = ane_open(nn);
-	if (err)
-		goto free;
+	nn->ane.fd = fd;
 
 	err = ane_chan_init(&nn->ane, nn);
 	if (err) {
 		ane_err("ane_chan_init failed with 0x%x\n", err);
-		goto close;
+		free(nn);
+		return NULL;
 	}
 
 	ane_log("initialized nn %p\n", (void *)nn);
 
 	return nn;
+}
 
-close:
-	ane_close(nn);
-free:
+struct ane_nn *ane_init(const struct ane_model *model)
+{
+	int fd = ane_open();
+	if (fd < 0) {
+		ane_err("failed to open device file\n");
+		return NULL;
+	}
+
+	return __ane_init(model, fd);
+}
+
+void __ane_free(struct ane_nn *nn)
+{
+	ane_log("freeing nn %p\n", (void *)nn);
+	ane_chan_free(&nn->ane, nn);
 	free(nn);
-exit:
-	return NULL;
 }
 
 void ane_free(struct ane_nn *nn)
 {
 	ane_log("freeing nn %p\n", (void *)nn);
 	ane_chan_free(&nn->ane, nn);
-	ane_close(nn);
+	ane_close(nn->ane.fd);
 	free(nn);
 }
 

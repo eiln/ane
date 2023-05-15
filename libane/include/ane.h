@@ -24,8 +24,15 @@ extern "C" {
 	} while (0)
 #endif /* LIBANE_NO_STATIC_ASSERT */
 
+int ane_open(void);
+void ane_close(int fd);
+
+struct ane_nn *__ane_init(const struct ane_model *model, int fd);
 struct ane_nn *ane_init(const struct ane_model *model);
+
+void __ane_free(struct ane_nn *nn);
 void ane_free(struct ane_nn *nn);
+
 int ane_exec(struct ane_nn *nn);
 
 void __ane_send(struct ane_nn *nn, void *from, const int idx);

@@ -10,6 +10,36 @@
 #include "ane_mem.h"
 #include "ane_priv.h"
 
+#ifdef LIBANE_STRICT_INDEX
+#define SRC_INDEX_CHECK(nn, idx, ret)                                              \
+	({                                                                         \
+		if (idx >= src_count(nn)) {                                        \
+			ane_err("attempted to index %d but max is %d; bailing.\n", \
+				idx, src_count(nn));                               \
+			return ret;                                                \
+		}                                                                  \
+	})
+#else
+#define SRC_INDEX_CHECK(nn, idx, ret) \
+	do {                          \
+	} while (0)
+#endif /* LIBANE_STRICT_INDEX */
+
+#ifdef LIBANE_STRICT_INDEX
+#define DST_INDEX_CHECK(nn, idx, ret)                                              \
+	({                                                                         \
+		if (idx >= dst_count(nn)) {                                        \
+			ane_err("attempted to index %d but max is %d; bailing.\n", \
+				idx, dst_count(nn));                               \
+			return ret;                                                \
+		}                                                                  \
+	})
+#else
+#define DST_INDEX_CHECK(nn, idx, ret) \
+	do {                          \
+	} while (0)
+#endif /* LIBANE_STRICT_INDEX */
+
 #define ANE_SYSFS_PATH "/dev/dri/renderD129"
 
 static inline int ane_open(struct ane_nn *nn)
@@ -94,32 +124,38 @@ int ane_exec(struct ane_nn *nn)
 
 void __ane_send(struct ane_nn *nn, void *from, const int idx)
 {
-	const int bdx = nn->src_bdx[idx];
-	memcpy(nn->chans[bdx].map, from, tile_size(nn, bdx));
+	SRC_INDEX_CHECK(nn, idx, );
+	memcpy(nn->chans[nn->src_bdx[idx]].map, from,
+	       tile_size(nn, nn->src_bdx[idx]));
 }
 
 void __ane_read(struct ane_nn *nn, void *to, const int idx)
 {
-	const int bdx = nn->dst_bdx[idx];
-	memcpy(to, nn->chans[bdx].map, tile_size(nn, bdx));
+	DST_INDEX_CHECK(nn, idx, );
+	memcpy(to, nn->chans[nn->dst_bdx[idx]].map,
+	       tile_size(nn, nn->dst_bdx[idx]));
 }
 
 void *__ane_src_chan(struct ane_nn *nn, const int idx)
 {
+	SRC_INDEX_CHECK(nn, idx, NULL);
 	return nn->chans[nn->src_bdx[idx]].map;
 }
 
 void *__ane_dst_chan(struct ane_nn *nn, const int idx)
 {
+	DST_INDEX_CHECK(nn, idx, NULL);
 	return nn->chans[nn->dst_bdx[idx]].map;
 }
 
 uint64_t __ane_src_size(struct ane_nn *nn, const int idx)
 {
+	SRC_INDEX_CHECK(nn, idx, 0);
 	return tile_size(nn, nn->src_bdx[idx]);
 }
 
 uint64_t __ane_dst_size(struct ane_nn *nn, const int idx)
 {
+	DST_INDEX_CHECK(nn, idx, 0);
 	return tile_size(nn, nn->dst_bdx[idx]);
 }

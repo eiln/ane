@@ -9,7 +9,7 @@
 #include "ane_mem.h"
 #include "ane_priv.h"
 
-#ifdef LIBANE_STRICT_INDEX
+#ifdef LIBANE_INDEX_CHECK
 #define SRC_INDEX_CHECK(nn, idx, ret)                                              \
 	({                                                                         \
 		if (idx >= src_count(nn)) {                                        \
@@ -22,9 +22,9 @@
 #define SRC_INDEX_CHECK(nn, idx, ret) \
 	do {                          \
 	} while (0)
-#endif /* LIBANE_STRICT_INDEX */
+#endif /* LIBANE_INDEX_CHECK */
 
-#ifdef LIBANE_STRICT_INDEX
+#ifdef LIBANE_INDEX_CHECK
 #define DST_INDEX_CHECK(nn, idx, ret)                                              \
 	({                                                                         \
 		if (idx >= dst_count(nn)) {                                        \
@@ -37,7 +37,7 @@
 #define DST_INDEX_CHECK(nn, idx, ret) \
 	do {                          \
 	} while (0)
-#endif /* LIBANE_STRICT_INDEX */
+#endif /* LIBANE_INDEX_CHECK */
 
 static inline struct ane_nn *__ane_init_fd(const struct ane_model *model,
 					   int fd)

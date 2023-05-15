@@ -61,7 +61,7 @@ struct ane_nn {
 
 /* #define LIBANE_STFU_LOG */
 /* #define LIBANE_STFU_ERR */
-/* #define LIBANE_STRICT_INDEX */
+/* #define LIBANE_INDEX_CHECK */
 /* #define LIBANE_NO_STATIC_ASSERT */
 
 #if defined(__cplusplus)

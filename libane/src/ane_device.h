@@ -6,7 +6,7 @@
 
 #include "ane_dev.h"
 
-int ane_open(void);
+int ane_open(int dev_id);
 void ane_close(int fd);
 
 #endif /* __ANE_DEVICE_H__ */

@@ -24,11 +24,11 @@ extern "C" {
 	} while (0)
 #endif /* LIBANE_NO_STATIC_ASSERT */
 
-int ane_open(void);
+int ane_open(int dev_id);
 void ane_close(int fd);
 
-struct ane_nn *__ane_init(const struct ane_model *model, int fd);
-struct ane_nn *ane_init(const struct ane_model *model);
+struct ane_nn *__ane_init(const struct ane_model *model, int dev_id);
+#define ane_init(model) (__ane_init(model, 0))
 
 void __ane_free(struct ane_nn *nn);
 void ane_free(struct ane_nn *nn);

@@ -39,7 +39,8 @@
 	} while (0)
 #endif /* LIBANE_STRICT_INDEX */
 
-struct ane_nn *__ane_init(const struct ane_model *model, int fd)
+static inline struct ane_nn *__ane_init_fd(const struct ane_model *model,
+					   int fd)
 {
 	int err;
 
@@ -64,15 +65,25 @@ struct ane_nn *__ane_init(const struct ane_model *model, int fd)
 	return nn;
 }
 
-struct ane_nn *ane_init(const struct ane_model *model)
+struct ane_nn *__ane_init(const struct ane_model *model, int dev_id)
 {
-	int fd = ane_open();
+	int fd;
+	struct ane_nn *nn;
+
+	fd = ane_open(dev_id);
 	if (fd < 0) {
-		ane_err("failed to open device file\n");
+		ane_err("failed to open device file for dev_id %d\n", dev_id);
 		return NULL;
 	}
 
-	return __ane_init(model, fd);
+	nn = __ane_init_fd(model, fd);
+	if (nn == NULL) {
+		ane_err("failed to init nn with fd %d\n", fd);
+		ane_close(fd);
+		return NULL;
+	}
+
+	return nn;
 }
 
 void __ane_free(struct ane_nn *nn)

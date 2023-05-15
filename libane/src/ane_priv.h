@@ -7,11 +7,14 @@
 #include <asm/types.h>
 #include <errno.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <string.h>
 
 #include "ane_dev.h"
 #include "drm_ane.h"
+
+#if !defined(LIBANE_STFU_LOG) || !defined(LIBANE_STFU_ERR)
+#include <stdio.h>
+#endif
 
 #define TILE_SHIFT	   0xEUL
 #define TILE_SIZE	   0x4000UL
@@ -27,13 +30,17 @@
 #ifndef LIBANE_STFU_LOG
 #define ane_log(a, ...) printf("LIBANE: LOG: " a, ##__VA_ARGS__)
 #else
-#define ane_log(...) (0)
+#define ane_log(...) \
+	do {         \
+	} while (0)
 #endif
 
 #ifndef LIBANE_STFU_ERR
 #define ane_err(a, ...) fprintf(stderr, "LIBANE: ERR: " a, ##__VA_ARGS__)
 #else
-#define ane_err(...) (0)
+#define ane_err(...) \
+	do {         \
+	} while (0)
 #endif
 
 #endif /* __ANE_PRIV_H__ */

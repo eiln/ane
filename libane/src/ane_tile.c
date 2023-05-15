@@ -78,12 +78,12 @@ static inline void tile_read(struct ane_nn *nn, void *to, const int idx)
 		   model->nchw[bdx][4], model->nchw[bdx][5]);
 }
 
-void ane_tile_send(struct ane_nn *nn, void *from, const int idx)
+void __ane_tile_send(struct ane_nn *nn, void *from, const int idx)
 {
 	tile_send(nn, from, idx);
 }
 
-void ane_tile_read(struct ane_nn *nn, void *to, const int idx)
+void __ane_tile_read(struct ane_nn *nn, void *to, const int idx)
 {
 	tile_read(nn, to, idx);
 }

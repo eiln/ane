@@ -5,12 +5,12 @@
 #include "ane_priv.h"
 
 #define FIFO_WIDTH 0x400 // nxtpow2(0x274)
-#define FIFO_COUNT 0x20
+#define FIFO_NEXT  0x1
 
 static inline void set_nid(void *td, int nid)
 {
 	uint32_t hdr0 = *(uint32_t *)td;
-	hdr0 = (hdr0 & 0xf00ffff) | ((nid & 0xff) << 16); /* trust me bro */
+	hdr0 = (hdr0 & 0xf00ffff) | ((nid & 0xff) << 16);
 	memcpy(td, &hdr0, sizeof(uint32_t));
 }
 
@@ -26,7 +26,7 @@ static inline void load_anec(struct ane_nn *nn)
 	memcpy(nn->fifo_chan.map + FIFO_WIDTH, anec_data, anec->td_size);
 
 	set_nid(nn->fifo_chan.map, ANE_FIFO_NID);
-	set_nid(nn->fifo_chan.map + FIFO_WIDTH, ANE_FIFO_NID + FIFO_COUNT);
+	set_nid(nn->fifo_chan.map + FIFO_WIDTH, ANE_FIFO_NID + FIFO_NEXT);
 }
 
 void ane_chan_free(struct ane_device *ane, struct ane_nn *nn)

@@ -583,7 +583,7 @@ static int ane_platform_probe(struct platform_device *pdev)
 	if (err < 0)
 		goto disable_pm;
 
-	pr_info("loaded ane!\n");
+	dev_info(dev, "loaded ane!\n");
 
 	return 0;
 

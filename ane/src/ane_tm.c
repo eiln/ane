@@ -86,8 +86,7 @@ int ane_tm_enqueue(struct ane_device *ane, struct ane_request *req)
 	return 0;
 }
 
-static inline void ane_tm_push_tq(struct ane_device *ane,
-				  struct ane_request *req)
+static void ane_tm_push_tq(struct ane_device *ane, struct ane_request *req)
 {
 	int qid = req->qid;
 	tm_write32(ane, TM_ADDR, tq_read32(ane, TQ_ADDR1(qid)));
@@ -95,7 +94,7 @@ static inline void ane_tm_push_tq(struct ane_device *ane,
 	tm_write32(ane, TM_PUSH, TQ_PRTY_TABLE[qid] | (qid & 7) << 8); // magic
 }
 
-static inline int ane_tm_get_status(struct ane_device *ane)
+static int ane_tm_get_status(struct ane_device *ane)
 {
 	int err;
 	u32 status;
@@ -108,7 +107,7 @@ static inline int ane_tm_get_status(struct ane_device *ane)
 	return err;
 }
 
-static inline void ane_tm_handle_irq(struct ane_device *ane)
+static void ane_tm_handle_irq(struct ane_device *ane)
 {
 	int line;
 

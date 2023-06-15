@@ -73,15 +73,6 @@ int ane_tm_enqueue(struct ane_device *ane, struct ane_request *req)
 {
 	int qid = req->qid;
 
-#if 0
-	// this sucks. write actual resetter
-	if ((tm_read32(ane, TM_ERROR1) != TM_IS_FINE) ||
-	    (tm_read32(ane, TM_ERROR2) != TM_IS_FINE)) {
-		dev_err(ane->dev, "engine at failure state\n");
-		return -EINVAL;
-	}
-#endif
-
 	tq_write32(ane, TQ_STATUS(qid), 0x1);
 
 	for (int bdx = 0; bdx < ANE_TILE_COUNT; bdx++) {

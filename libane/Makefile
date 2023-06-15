@@ -5,9 +5,6 @@ CFLAGS = -I. -I./include -Wall -Werror -Wextra \
 	-Wdeclaration-after-statement \
 	-O2 -std=gnu99
 
-CDEFS = -DANE_DEVNODE=\"/dev/dri/renderD129\"
-CFLAGS += $(CDEFS)
-
 UAPI_PATH = -I/home/eileen/ane/ane/src/include
 LIBS = -I/usr/include/libdrm $(UAPI_PATH)
 

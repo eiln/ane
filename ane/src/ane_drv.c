@@ -396,8 +396,6 @@ static const struct drm_driver ane_drm_driver = {
 	.name = "ane",
 	.desc = "Apple Neural Engine driver",
 	.date = "20230103",
-	.major = 1,
-	.minor = 0,
 };
 
 static int ane_iommu_domain_init(struct ane_device *ane)

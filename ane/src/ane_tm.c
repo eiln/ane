@@ -89,7 +89,7 @@ int ane_tm_enqueue(struct ane_device *ane, struct ane_request *req)
 	}
 
 	tq_write32(ane, TQ_SIZE1(qid), ((req->td_size >> 2) - 1) << 0x10);
-	tq_write32(ane, TQ_ADDR1(qid), req->fifo_addr);
+	tq_write32(ane, TQ_ADDR1(qid), req->btsp_iova);
 	tq_write32(ane, TQ_NID1(qid), (req->nid & 0xff) << 8 | 1);
 
 	return 0;

@@ -4,9 +4,6 @@
 #include "ane_bo.h"
 #include "ane_priv.h"
 
-#define FIFO_WIDTH 0x400 // nxtpow2(0x274)
-#define FIFO_NEXT  0x1
-
 static inline void set_nid(void *td, int nid)
 {
 	uint32_t hdr0 = *(uint32_t *)td;
@@ -22,16 +19,13 @@ static inline void load_anec(struct ane_nn *nn)
 	memcpy(nn->chans[0].map, anec_data, anec->size);
 
 	/* do not fucking overflow */
-	memcpy(nn->fifo_chan.map, anec_data, anec->td_size);
-	memcpy(nn->fifo_chan.map + FIFO_WIDTH, anec_data, anec->td_size);
-
-	set_nid(nn->fifo_chan.map, ANE_FIFO_NID);
-	set_nid(nn->fifo_chan.map + FIFO_WIDTH, ANE_FIFO_NID + FIFO_NEXT);
+	memcpy(nn->btsp_chan.map, anec_data, anec->td_size);
+	set_nid(nn->btsp_chan.map, ANE_FIFO_NID);
 }
 
 void ane_chan_free(struct ane_device *ane, struct ane_nn *nn)
 {
-	ane_bo_free(ane, &nn->fifo_chan);
+	ane_bo_free(ane, &nn->btsp_chan);
 
 	for (int bdx = 0; bdx < ANE_TILE_COUNT; bdx++) {
 		ane_bo_free(ane, &nn->chans[bdx]);
@@ -71,8 +65,8 @@ int ane_chan_init(struct ane_device *ane, struct ane_nn *nn)
 		}
 	}
 
-	bo = &nn->fifo_chan;
-	bo->size = tile_align(FIFO_WIDTH * 2);
+	bo = &nn->btsp_chan;
+	bo->size = tile_align(anec->td_size);
 	err = ane_bo_init(ane, bo);
 	if (err < 0)
 		goto error;

@@ -117,7 +117,7 @@ int ane_exec(struct ane_nn *nn)
 			args.handles[bdx] = nn->chans[bdx].handle;
 		}
 	}
-	args.fifo_handle = nn->fifo_chan.handle;
+	args.btsp_handle = nn->btsp_chan.handle;
 
 	return ioctl(nn->ane.fd, DRM_IOCTL_ANE_SUBMIT, &args);
 }

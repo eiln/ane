@@ -238,7 +238,7 @@ static int ane_submit(struct drm_device *drm, void *data, struct drm_file *file)
 
 	if (args->pad || !args->tsk_size || !args->td_count || !args->td_size ||
 	    !args->handles[CMD_BUF_BDX] || args->handles[KRN_BUF_BDX] ||
-	    !args->fifo_handle) {
+	    !args->btsp_handle) {
 		return -EINVAL;
 	}
 
@@ -266,10 +266,10 @@ static int ane_submit(struct drm_device *drm, void *data, struct drm_file *file)
 	req.bar[KRN_BUF_BDX] =
 		req.bar[CMD_BUF_BDX] + round_up(args->tsk_size, ANE_CMD_GRAN);
 
-	bo = bo_lookup(file, args->fifo_handle);
+	bo = bo_lookup(file, args->btsp_handle);
 	if (!bo)
 		return -EINVAL;
-	req.fifo_addr = lower_32_bits(bo->iova);
+	req.btsp_iova = lower_32_bits(bo->iova);
 
 	// TODO
 	mutex_lock(&ane->engine_lock);

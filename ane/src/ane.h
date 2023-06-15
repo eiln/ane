@@ -50,7 +50,7 @@ struct ane_request {
 	u32 nid;
 	u32 td_size;
 	u32 td_count;
-	u32 fifo_addr;
+	u32 btsp_iova;
 	u32 bar[ANE_TILE_COUNT];
 };
 

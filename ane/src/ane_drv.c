@@ -271,7 +271,6 @@ static int ane_submit(struct drm_device *drm, void *data, struct drm_file *file)
 		return -EINVAL;
 	req.btsp_iova = lower_32_bits(bo->iova);
 
-	// TODO
 	mutex_lock(&ane->engine_lock);
 
 	err = ane_tm_enqueue(ane, &req);

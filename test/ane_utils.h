@@ -61,4 +61,40 @@ static inline void *ane_zmemalign(size_t size)
 	return ptr;
 }
 
+static inline int ane_fread(const char *fname, void *data, size_t size)
+{
+	size_t done;
+	FILE *fp = fopen(fname, "rb");
+	if (!fp) {
+		ane_err("failed to open file %s", fname);
+		return -EINVAL;
+	}
+
+	done = fread((char *)data, sizeof(char), size, fp);
+	if (done != size) {
+		ane_err("read 0x%zx/0x%zx requested\n", done, size);
+	}
+
+	fclose(fp);
+	return 0;
+}
+
+static inline int ane_fwrite(const char *fname, void *data, size_t size)
+{
+	size_t done;
+	FILE *fp = fopen(fname, "wb");
+	if (!fp) {
+		ane_err("failed to open file %s", fname);
+		return -EINVAL;
+	}
+
+	done = fwrite((char *)data, sizeof(char), size, fp);
+	if (done != size) {
+		ane_err("wrote 0x%zx/0x%zx requested\n", done, size);
+	}
+
+	fclose(fp);
+	return 0;
+}
+
 #endif /* __ANE_UTILS_H__ */

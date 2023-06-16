@@ -6,7 +6,7 @@
 
 #include "ane_priv.h"
 
-#define ANE_DEVNODE "/dev/dri/renderD129"
+#define ANE_DEVNODE "/dev/accel/accel0"
 
 int ane_open(int dev_id)
 {

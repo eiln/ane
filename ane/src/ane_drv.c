@@ -287,9 +287,9 @@ unlock:
 }
 
 static const struct drm_ioctl_desc ane_drm_ioctls[] = {
-	DRM_IOCTL_DEF_DRV(ANE_BO_INIT, ane_bo_init, DRM_RENDER_ALLOW),
-	DRM_IOCTL_DEF_DRV(ANE_BO_FREE, ane_bo_free, DRM_RENDER_ALLOW),
-	DRM_IOCTL_DEF_DRV(ANE_SUBMIT, ane_submit, DRM_RENDER_ALLOW),
+	DRM_IOCTL_DEF_DRV(ANE_BO_INIT, ane_bo_init, 0),
+	DRM_IOCTL_DEF_DRV(ANE_BO_FREE, ane_bo_free, 0),
+	DRM_IOCTL_DEF_DRV(ANE_SUBMIT, ane_submit, 0),
 };
 
 static int ane_drm_open(struct drm_device *drm, struct drm_file *file)
@@ -376,17 +376,18 @@ static int ane_drm_mmap(struct file *file, struct vm_area_struct *vma)
 
 static const struct file_operations ane_drm_fops = {
 	.owner = THIS_MODULE,
-	.open = drm_open, // accel_open
+	.open = accel_open,
 	.release = drm_release,
 	.unlocked_ioctl = ane_drm_unlocked_ioctl,
-	.mmap = ane_drm_mmap,
+	.compat_ioctl = drm_compat_ioctl,
 	.poll = drm_poll,
 	.read = drm_read,
 	.llseek = noop_llseek,
+	.mmap = ane_drm_mmap,
 };
 
 static const struct drm_driver ane_drm_driver = {
-	.driver_features = DRIVER_GEM | DRIVER_RENDER, // DRIVER_COMPUTE_ACCEL
+	.driver_features = DRIVER_GEM | DRIVER_COMPUTE_ACCEL,
 	.open = ane_drm_open,
 	.postclose = ane_drm_postclose,
 	.ioctls = ane_drm_ioctls,

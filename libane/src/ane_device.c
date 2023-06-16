@@ -10,8 +10,9 @@
 #include "ane_mem.h"
 #include "ane_priv.h"
 
-#define MAX_NODE_LEN   64
-#define MAX_NODE_COUNT 10
+#define MAX_ANE_DEVICES 2
+#define MAX_NODE_LEN	30
+#define MAX_NODE_COUNT	64
 
 static inline bool is_ane_device(int fd)
 {
@@ -57,7 +58,7 @@ static inline int ane_device_open(const char *node)
 
 	fd = open(node, O_RDWR | O_CLOEXEC, S_IRUSR | S_IWUSR);
 	if (fd < 0) {
-		ane_err("failed to open node %s with %d\n", node, fd);
+		// ane_err("failed to open node %s with %d\n", node, fd);
 		return -ENODEV;
 	}
 
@@ -73,7 +74,13 @@ int ane_open(int dev_id)
 {
 	int fd;
 	char node[MAX_NODE_LEN];
-	(void)dev_id;
+	int found = 0;
+
+	if (dev_id < 0 || dev_id >= MAX_ANE_DEVICES) {
+		ane_err("invalid dev_id; 0 <= dev_id <= %d\n",
+			MAX_ANE_DEVICES - 1);
+		return -EINVAL;
+	}
 
 	for (int i = 0; i < MAX_NODE_COUNT; i++) {
 		snprintf(node, MAX_NODE_LEN, "/dev/accel/accel%d", i);
@@ -83,11 +90,16 @@ int ane_open(int dev_id)
 			continue;
 		}
 
-		// ane_log("found device %s fd %d\n", node, fd);
-		return fd;
+		if (dev_id == found) {
+			// ane_log("found device %s fd %d\n", node, fd);
+			return fd;
+		}
+
+		found++;
+		close(fd);
 	}
 
-	ane_err("failed to find ane device\n");
+	ane_err("failed to find device with dev_id %d\n", dev_id);
 	return -ENODEV;
 }
 

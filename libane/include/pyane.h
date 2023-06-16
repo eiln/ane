@@ -11,7 +11,7 @@
  * just reduces complexity in the already-hacky anecc.
  */
 
-void *pyane_init(void); /* Completed by anecc */
+void *pyane_init(int dev_id); /* Completed by anecc */
 
 int pyane_free(struct ane_nn *nn)
 {

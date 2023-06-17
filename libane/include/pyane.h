@@ -241,13 +241,13 @@ int pyane_info(struct ane_nn *nn, unsigned long *src_count,
 	*src_count = nn->model->input_count;
 	*dst_count = nn->model->output_count;
 	for (int i = 0; i < nn->model->input_count; i++) {
-		int bdx = nn->src_bdx[i];
+		int bdx = get_src_bdx(nn, idx);
 		for (int j = 0; j < 6; j++) {
 			*is[i * 6 + j] = nn->model->nchw[bdx][j];
 		}
 	}
 	for (int i = 0; i < nn->model->output_count; i++) {
-		int bdx = nn->dst_bdx[i];
+		int bdx = get_dst_bdx(nn, idx);
 		for (int j = 0; j < 6; j++) {
 			*os[i * 6 + j] = nn->model->nchw[bdx][j];
 		}

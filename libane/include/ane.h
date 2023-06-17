@@ -24,14 +24,15 @@ extern "C" {
 	} while (0)
 #endif /* LIBANE_NO_STATIC_ASSERT */
 
-int ane_open(int dev_id);
-void ane_close(int fd);
+struct ane_nn *__ane_init_from_model(const struct ane_model *model, int dev_id);
+struct ane_nn *__ane_init(const char *path, int dev_id);
+#define ane_init_from_model(model) (__ane_init_from_model(model, 0))
+#define ane_init(path)		   (__ane_init(path, 0))
 
-struct ane_nn *__ane_init(const struct ane_model *model, int dev_id);
-#define ane_init(model) (__ane_init(model, 0))
-
+void __ane_free_from_model(struct ane_nn *nn);
 void __ane_free(struct ane_nn *nn);
-void ane_free(struct ane_nn *nn);
+#define ane_free_from_model(nn) (__ane_free_from_model(nn))
+#define ane_free(nn)		(__ane_free(nn))
 
 int ane_exec(struct ane_nn *nn);
 

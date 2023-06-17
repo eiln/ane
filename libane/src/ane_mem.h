@@ -29,4 +29,25 @@ static inline void *ane_zmalloc(size_t size)
 	return ptr;
 }
 
+static inline void *ane_memalign(size_t size)
+{
+	void *ptr = NULL;
+	if (posix_memalign(&ptr, TILE_SIZE, size)) {
+		ane_err("failed to memalign size 0x%zx\n", size);
+		return NULL;
+	}
+	return ptr;
+}
+
+static inline void *ane_zmemalign(size_t size)
+{
+	void *ptr = NULL;
+	if (posix_memalign(&ptr, TILE_SIZE, size)) {
+		ane_err("failed to memalign size 0x%zx\n", size);
+		return NULL;
+	}
+	memset(ptr, 0, size);
+	return ptr;
+}
+
 #endif /* __ANE_MEM_H__ */

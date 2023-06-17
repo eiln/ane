@@ -52,7 +52,7 @@ static inline bool is_ane_device(int fd)
 	return true;
 }
 
-static inline int ane_device_open(const char *node)
+static inline int open_fd(const char *node)
 {
 	int fd;
 
@@ -70,7 +70,7 @@ static inline int ane_device_open(const char *node)
 	return fd;
 }
 
-int ane_open(int dev_id)
+int ane_device_open(int dev_id)
 {
 	int fd;
 	char node[MAX_NODE_LEN];
@@ -85,7 +85,7 @@ int ane_open(int dev_id)
 	for (int i = 0; i < MAX_NODE_COUNT; i++) {
 		snprintf(node, MAX_NODE_LEN, "/dev/accel/accel%d", i);
 
-		fd = ane_device_open(node);
+		fd = open_fd(node);
 		if (fd < 0) {
 			continue;
 		}
@@ -103,7 +103,7 @@ int ane_open(int dev_id)
 	return -ENODEV;
 }
 
-void ane_close(int fd)
+void ane_device_close(int fd)
 {
 	if (!(fd < 0)) {
 		close(fd);

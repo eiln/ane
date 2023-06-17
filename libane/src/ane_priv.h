@@ -24,8 +24,11 @@
 #define tile_size(nn, bdx) (tile_shift(to_anec(nn)->tiles[bdx]))
 
 #define to_anec(nn)	   (&nn->model->anec)
-#define src_count(nn)	   (nn->model->input_count)
-#define dst_count(nn)	   (nn->model->output_count)
+#define src_count(nn)	   (to_anec(nn)->src_count)
+#define dst_count(nn)	   (to_anec(nn)->dst_count)
+
+#define src_bdx(nn, idx)   (4 + to_anec(nn)->dst_count + idx)
+#define dst_bdx(nn, idx)   (4 + idx)
 
 #ifndef LIBANE_STFU_LOG
 #define ane_log(a, ...) printf("LIBANE: LOG: " a, ##__VA_ARGS__)

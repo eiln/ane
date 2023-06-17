@@ -12,9 +12,9 @@ BUILD_DIR = build
 SRC_DIR = src
 
 OBJECTS = $(BUILD_DIR)/ane.o \
-	  $(BUILD_DIR)/ane_bo.o \
 	  $(BUILD_DIR)/ane_chan.o \
 	  $(BUILD_DIR)/ane_device.o \
+	  $(BUILD_DIR)/ane_model.o \
 	  $(BUILD_DIR)/ane_tile.o
 
 .PHONY: libane install uninstall clean

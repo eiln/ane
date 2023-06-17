@@ -10,30 +10,23 @@ extern "C" {
 
 #include <stdint.h>
 
-#define TILE_COUNT   0x20
-
-#define ANE_TILE_CMD 0x1
-#define ANE_TILE_ITM 0x2
-#define ANE_TILE_DST 0x3
-#define ANE_TILE_SRC 0x4
+#define TILE_COUNT 0x20
 
 struct anec {
 	const uint64_t size;
+	const uint32_t td_size;
+	const uint32_t td_count;
 	const uint64_t tsk_size;
 	const uint64_t krn_size;
-	const uint32_t td_count;
-	const uint32_t td_size;
+	const uint32_t src_count;
+	const uint32_t dst_count;
 	const uint32_t tiles[TILE_COUNT];
-	const uint32_t types[TILE_COUNT];
-};
+	const uint64_t nchw[TILE_COUNT][6];
+} __attribute__((__packed__, aligned(1)));
 
 struct ane_model {
-	const char *name;
-	const void *data;
-	const struct anec anec;
-	const int input_count;
-	const int output_count;
-	const uint64_t nchw[TILE_COUNT][6];
+	void *data;
+	struct anec anec;
 };
 
 struct ane_device {
@@ -52,11 +45,9 @@ struct ane_bo {
 
 struct ane_nn {
 	struct ane_device ane;
-	const struct ane_model *model;
+	struct ane_model *model;
 	struct ane_bo chans[TILE_COUNT];
 	struct ane_bo btsp_chan;
-	int src_bdx[TILE_COUNT];
-	int dst_bdx[TILE_COUNT];
 };
 
 /* #define LIBANE_STFU_LOG */

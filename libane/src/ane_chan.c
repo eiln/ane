@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
 /* Copyright 2022 Eileen Yoon <eyn@gmx.com> */
 
-#include "ane_bo.h"
+#include <drm.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
+
 #include "ane_priv.h"
 
 static inline void set_nid(void *td, int nid)
@@ -11,16 +14,76 @@ static inline void set_nid(void *td, int nid)
 	memcpy(td, &hdr0, sizeof(uint32_t));
 }
 
-static inline void load_anec(struct ane_nn *nn)
+static inline void set_command(struct ane_nn *nn)
 {
 	const struct anec *anec = to_anec(nn);
-	const void *anec_data = nn->model->data;
+	const void *data = nn->model->data;
 
-	memcpy(nn->chans[0].map, anec_data, anec->size);
+	memcpy(nn->chans[0].map, data, anec->size);
 
 	/* do not fucking overflow */
-	memcpy(nn->btsp_chan.map, anec_data, anec->td_size);
+	memcpy(nn->btsp_chan.map, data, anec->td_size);
 	set_nid(nn->btsp_chan.map, ANE_FIFO_NID);
+}
+
+static inline int bo_init(struct ane_device *ane, struct ane_bo *bo)
+{
+	struct drm_ane_bo_init args = { .size = bo->size };
+	int err = ioctl(ane->fd, DRM_IOCTL_ANE_BO_INIT, &args);
+	bo->handle = args.handle;
+	bo->offset = args.offset;
+	return err;
+}
+
+static inline int bo_free(struct ane_device *ane, struct ane_bo *bo)
+{
+	struct drm_ane_bo_free args = { .handle = bo->handle };
+	return ioctl(ane->fd, DRM_IOCTL_ANE_BO_FREE, &args);
+}
+
+static inline int bo_mmap(struct ane_device *ane, struct ane_bo *bo)
+{
+	bo->map = mmap(0, bo->size, PROT_READ | PROT_WRITE, MAP_SHARED, ane->fd,
+		       bo->offset);
+
+	if (bo->map == MAP_FAILED) {
+		bo->map = NULL;
+		ane_err("failed to mmap bo\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static inline int ane_bo_init(struct ane_device *ane, struct ane_bo *bo)
+{
+	int err;
+
+	if (!bo->size)
+		return -EINVAL;
+
+	err = bo_init(ane, bo);
+	if (err < 0) {
+		ane_err("bo_init failed with 0x%x\n", err);
+		return err;
+	}
+
+	err = bo_mmap(ane, bo);
+	if (err < 0) {
+		bo_free(ane, bo);
+		ane_err("bo_mmap failed with 0x%x\n", err);
+		return err;
+	}
+
+	return 0;
+}
+
+static inline void ane_bo_free(struct ane_device *ane, struct ane_bo *bo)
+{
+	if (bo->map) {
+		munmap(bo->map, bo->size);
+		bo_free(ane, bo);
+	}
 }
 
 void ane_chan_free(struct ane_device *ane, struct ane_nn *nn)
@@ -38,23 +101,6 @@ int ane_chan_init(struct ane_device *ane, struct ane_nn *nn)
 	struct ane_bo *bo;
 	int err;
 
-	/* creating bar index masks to easily iterate over */
-	int ic = 0, oc = 0;
-	for (int bdx = 0; bdx < ANE_TILE_COUNT; bdx++) {
-		if (anec->types[bdx] == ANE_TILE_SRC) {
-			nn->src_bdx[ic] = bdx;
-			ic++;
-		} else if (anec->types[bdx] == ANE_TILE_DST) {
-			nn->dst_bdx[oc] = bdx;
-			oc++;
-		}
-	}
-
-	if (ic != src_count(nn) || oc != dst_count(nn)) {
-		ane_err("invalid src/dst setup\n");
-		return -EINVAL;
-	}
-
 	for (int bdx = 0; bdx < ANE_TILE_COUNT; bdx++) {
 		if (anec->tiles[bdx]) {
 			bo = &nn->chans[bdx];
@@ -71,7 +117,7 @@ int ane_chan_init(struct ane_device *ane, struct ane_nn *nn)
 	if (err < 0)
 		goto error;
 
-	load_anec(nn);
+	set_command(nn);
 
 	return 0;
 

@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: MIT
 /* Copyright 2022 Eileen Yoon <eyn@gmx.com> */
 
-#ifndef __PYANE_H__
-#define __PYANE_H__
+#include <ane.h>
 
-#include "ane.h"
+#define to_anec(nn)	     (&nn->model->anec)
+#define get_src_count(nn)    (to_anec(nn)->src_count)
+#define get_dst_count(nn)    (to_anec(nn)->dst_count)
+#define get_src_bdx(nn, idx) (4 + to_anec(nn)->dst_count + idx)
+#define get_dst_bdx(nn, idx) (4 + idx)
 
-/* Void ptr wrappers around ane.h functions for Python.
- * This really has no business being inside a header,
- * just reduces complexity in the already-hacky anecc.
- */
-
-void *pyane_init(int dev_id); /* Completed by anecc */
+void *pyane_init(char *path, int dev_id)
+{
+	return __ane_init(path, dev_id);
+}
 
 int pyane_free(struct ane_nn *nn)
 {
@@ -38,7 +39,7 @@ int pyane_send(struct ane_nn *nn, void *x0, void *x1, void *x2, void *x3,
 				 x8,  x9,  x10, x11, x12, x13, x14, x15,
 				 x16, x17, x18, x19, x20, x21, x22, x23,
 				 x24, x25, x26, x27, x28, x29, x30, x31 };
-	for (int i = 0; i < nn->model->input_count; i++) {
+	for (uint32_t i = 0; i < get_src_count(nn); i++) {
 		__ane_tile_send(nn, xs[i], i);
 	}
 	return 0;
@@ -55,7 +56,7 @@ int pyane_read(struct ane_nn *nn, void *x0, void *x1, void *x2, void *x3,
 				 x8,  x9,  x10, x11, x12, x13, x14, x15,
 				 x16, x17, x18, x19, x20, x21, x22, x23,
 				 x24, x25, x26, x27, x28, x29, x30, x31 };
-	for (int i = 0; i < nn->model->output_count; i++) {
+	for (uint32_t i = 0; i < get_dst_count(nn); i++) {
 		__ane_read(nn, xs[i], i);
 	}
 	return 0;
@@ -238,21 +239,19 @@ int pyane_info(struct ane_nn *nn, unsigned long *src_count,
 		x372, x373, x374, x375, x376, x377, x378, x379, x380, x381,
 		x382, x383
 	};
-	*src_count = nn->model->input_count;
-	*dst_count = nn->model->output_count;
-	for (int i = 0; i < nn->model->input_count; i++) {
-		int bdx = get_src_bdx(nn, idx);
+	*src_count = get_src_count(nn);
+	*dst_count = get_dst_count(nn);
+	for (uint32_t i = 0; i < get_src_count(nn); i++) {
+		int bdx = get_src_bdx(nn, i);
 		for (int j = 0; j < 6; j++) {
-			*is[i * 6 + j] = nn->model->nchw[bdx][j];
+			*is[i * 6 + j] = to_anec(nn)->nchw[bdx][j];
 		}
 	}
-	for (int i = 0; i < nn->model->output_count; i++) {
-		int bdx = get_dst_bdx(nn, idx);
+	for (uint32_t i = 0; i < get_dst_count(nn); i++) {
+		int bdx = get_dst_bdx(nn, i);
 		for (int j = 0; j < 6; j++) {
-			*os[i * 6 + j] = nn->model->nchw[bdx][j];
+			*os[i * 6 + j] = to_anec(nn)->nchw[bdx][j];
 		}
 	}
 	return 0;
 }
-
-#endif /* __PYANE_H__ */

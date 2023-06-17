@@ -1,4 +1,4 @@
 
 install:
 	make -C libane install
-	make -C python install
+	make -C bindings install

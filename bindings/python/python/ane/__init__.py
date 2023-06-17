@@ -3,17 +3,16 @@
 # SPDX-License-Identifier: MIT
 # Copyright 2022 Eileen Yoon <eyn@gmx.com>
 
-import os
 import atexit
 import ctypes
 import numpy as np
 from ctypes import c_void_p, c_ulong
 
 class Driver:
-	def __init__(self, path):
-		self.lib = ctypes.cdll.LoadLibrary(path)
+	def __init__(self, lib_path):
+		self.lib = ctypes.cdll.LoadLibrary(lib_path)
 		self.lib.pyane_init.restype = c_void_p
-		self.lib.pyane_init.argtypes = [ctypes.c_int]
+		self.lib.pyane_init.argtypes = [ctypes.c_char_p, ctypes.c_int]
 		self.lib.pyane_free.argtypes = [c_void_p]
 		self.lib.pyane_exec.argtypes = [c_void_p]
 		self.lib.pyane_send.argtypes = [c_void_p] + [c_void_p] * 0x20
@@ -26,16 +25,16 @@ class Driver:
 		for handle in self.handles:
 			self.lib.pyane_free(handle)
 
-	def register(self, dev_id):
-		handle = self.lib.pyane_init(dev_id)
+	def register(self, path, dev_id):
+		handle = self.lib.pyane_init(path.encode('ascii'), dev_id)
 		if (handle == None): raise RuntimeError("driver error")
 		self.handles[handle] = handle
 		return handle
 
 class Model:
-	def __init__(self, path, dev_id=0):
-		self.driver = Driver(os.path.abspath(path))
-		self.handle = self.driver.register(dev_id)
+	def __init__(self, path, dev_id=0, lib_path="/usr/lib/libane_python.so"):
+		self.driver = Driver(lib_path)
+		self.handle = self.driver.register(path, dev_id)
 		counts, nchws = [c_ulong(), c_ulong()], [c_ulong() for x in range(2 * 0x20 * 6)]
 		self.driver.lib.pyane_info(self.handle, *[ctypes.byref(x) for x in counts + nchws])
 		self.src_count, self.dst_count = counts[0].value, counts[1].value

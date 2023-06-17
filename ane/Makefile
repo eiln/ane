@@ -13,6 +13,7 @@ install:
 	sudo make -C $(KERNELDIR) M=$(PWD) modules_install
 	# sudo depmod -a
 	sudo modprobe ane
+	sudo chmod 666 /dev/accel/accel0
 
 uninstall:
 	sudo modprobe -r ane

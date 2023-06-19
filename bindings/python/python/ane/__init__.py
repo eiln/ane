@@ -8,7 +8,7 @@ import ctypes
 import numpy as np
 from ctypes import c_void_p, c_ulong
 
-class Driver:
+class _Driver:
 	def __init__(self, lib_path):
 		self.lib = ctypes.cdll.LoadLibrary(lib_path)
 		self.lib.pyane_init.restype = c_void_p
@@ -31,9 +31,9 @@ class Driver:
 		self.handles[handle] = handle
 		return handle
 
-class Model:
+class model:
 	def __init__(self, path, dev_id=0, lib_path="/usr/lib/libane_python.so"):
-		self.driver = Driver(lib_path)
+		self.driver = _Driver(lib_path)
 		self.handle = self.driver.register(path, dev_id)
 		counts, nchws = [c_ulong(), c_ulong()], [c_ulong() for x in range(2 * 0x20 * 6)]
 		self.driver.lib.pyane_info(self.handle, *[ctypes.byref(x) for x in counts + nchws])

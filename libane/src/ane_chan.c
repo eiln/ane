@@ -65,17 +65,22 @@ static inline int ane_bo_init(struct ane_device *ane, struct ane_bo *bo)
 	err = bo_init(ane, bo);
 	if (err < 0) {
 		ane_err("bo_init failed with 0x%x\n", err);
-		return err;
+		goto error;
 	}
 
 	err = bo_mmap(ane, bo);
 	if (err < 0) {
 		bo_free(ane, bo);
 		ane_err("bo_mmap failed with 0x%x\n", err);
-		return err;
+		goto error;
 	}
 
 	return 0;
+
+error:
+	bo->handle = 0;
+	bo->offset = 0;
+	return err;
 }
 
 static inline void ane_bo_free(struct ane_device *ane, struct ane_bo *bo)
@@ -84,6 +89,7 @@ static inline void ane_bo_free(struct ane_device *ane, struct ane_bo *bo)
 		munmap(bo->map, bo->size);
 		bo_free(ane, bo);
 	}
+	bo->map = NULL;
 }
 
 void ane_chan_free(struct ane_device *ane, struct ane_nn *nn)

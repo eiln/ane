@@ -36,6 +36,9 @@ void __ane_free(struct ane_nn *nn);
 
 int ane_exec(struct ane_nn *nn);
 
+uint32_t ane_src_count(struct ane_nn *nn);
+uint32_t ane_dst_count(struct ane_nn *nn);
+
 void __ane_send(struct ane_nn *nn, void *from, const int idx);
 void __ane_read(struct ane_nn *nn, void *to, const int idx);
 

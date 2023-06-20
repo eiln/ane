@@ -3,12 +3,6 @@
 
 #include <ane.h>
 
-#define to_anec(nn)	     (&nn->model->anec)
-#define get_src_count(nn)    (to_anec(nn)->src_count)
-#define get_dst_count(nn)    (to_anec(nn)->dst_count)
-#define get_src_bdx(nn, idx) (4 + to_anec(nn)->dst_count + idx)
-#define get_dst_bdx(nn, idx) (4 + idx)
-
 void *pyane_init(char *path, int dev_id)
 {
 	return __ane_init(path, dev_id);
@@ -39,7 +33,7 @@ int pyane_send(struct ane_nn *nn, void *x0, void *x1, void *x2, void *x3,
 				 x8,  x9,  x10, x11, x12, x13, x14, x15,
 				 x16, x17, x18, x19, x20, x21, x22, x23,
 				 x24, x25, x26, x27, x28, x29, x30, x31 };
-	for (uint32_t i = 0; i < get_src_count(nn); i++) {
+	for (uint32_t i = 0; i < ane_src_count(nn); i++) {
 		__ane_tile_send(nn, xs[i], i);
 	}
 	return 0;
@@ -56,7 +50,7 @@ int pyane_read(struct ane_nn *nn, void *x0, void *x1, void *x2, void *x3,
 				 x8,  x9,  x10, x11, x12, x13, x14, x15,
 				 x16, x17, x18, x19, x20, x21, x22, x23,
 				 x24, x25, x26, x27, x28, x29, x30, x31 };
-	for (uint32_t i = 0; i < get_dst_count(nn); i++) {
+	for (uint32_t i = 0; i < ane_dst_count(nn); i++) {
 		__ane_read(nn, xs[i], i);
 	}
 	return 0;

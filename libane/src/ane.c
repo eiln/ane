@@ -96,6 +96,16 @@ int ane_exec(struct ane_nn *nn)
 	return ioctl(nn->ane.fd, DRM_IOCTL_ANE_SUBMIT, &args);
 }
 
+uint32_t ane_src_count(struct ane_nn *nn)
+{
+	return to_anec(nn)->src_count;
+}
+
+uint32_t ane_dst_count(struct ane_nn *nn)
+{
+	return to_anec(nn)->dst_count;
+}
+
 #ifdef LIBANE_INDEX_CHECK
 #define SRC_INDEX_CHECK(nn, idx, ret)                                              \
 	({                                                                         \

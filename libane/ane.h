@@ -24,18 +24,6 @@ struct anec {
 	const uint64_t nchw[TILE_COUNT][6];
 } __attribute__((__packed__, aligned(1)));
 
-struct ane_model {
-	void *data;
-	struct anec anec;
-};
-
-struct ane_device {
-	int fd;
-	int ane_type;
-	int ane_subtype;
-	int ane_id;
-};
-
 struct ane_bo {
 	void *map;
 	uint64_t size;
@@ -44,111 +32,92 @@ struct ane_bo {
 };
 
 struct ane_nn {
-	struct ane_device ane;
-	struct ane_model *model;
+	int fd;
+	void *data;
+	struct anec anec;
 	struct ane_bo chans[TILE_COUNT];
 	struct ane_bo btsp_chan;
 };
 
-/* #define LIBANE_STFU_LOG */
-/* #define LIBANE_STFU_ERR */
-/* #define LIBANE_INDEX_CHECK */
-/* #define LIBANE_NO_STATIC_ASSERT */
+/* #define LIBANE_CONFIG_STFU_LOG */
+/* #define LIBANE_CONFIG_STFU_ERR */
+/* #define LIBANE_CONFIG_INDEX_CHECK */
+/* #define LIBANE_CONFIG_NO_STATIC_ASSERT */
 
-#ifndef LIBANE_NO_STATIC_ASSERT
+#ifndef LIBANE_CONFIG_NO_STATIC_ASSERT
 #ifdef __cplusplus
 #ifndef _Static_assert
 #define _Static_assert static_assert
 #endif /* _Static_assert */
 #endif /* __cplusplus */
-#define STATIC_ASSERT(test_for_true) \
+#define LIBANE_STATIC_ASSERT(test_for_true) \
 	_Static_assert((test_for_true), "(" #test_for_true ") failed")
 #else
-#define STATIC_ASSERT(test_for_true) \
-	do {                         \
+#define LIBANE_STATIC_ASSERT(test_for_true) \
+	do {                                \
 	} while (0)
-#endif /* LIBANE_NO_STATIC_ASSERT */
+#endif /* LIBANE_CONFIG_NO_STATIC_ASSERT */
 
 int ane_open(int dev_id);
 void ane_close(int fd);
 
-struct ane_model *ane_model_init(const char *path);
-void ane_model_free(struct ane_model *model);
-
-struct ane_nn *__ane_init_from_model(struct ane_model *model, int dev_id);
 struct ane_nn *__ane_init(const char *path, int dev_id);
-#define ane_init_from_model(model) (__ane_init_from_model(model, 0))
-#define ane_init(path)		   (__ane_init(path, 0))
+#define ane_init(path) (__ane_init(path, 0))
 
-void __ane_free_from_model(struct ane_nn *nn);
 void __ane_free(struct ane_nn *nn);
-#define ane_free_from_model(nn) (__ane_free_from_model(nn))
-#define ane_free(nn)		(__ane_free(nn))
+#define ane_free(nn) (__ane_free(nn))
 
 int ane_exec(struct ane_nn *nn);
 
-uint32_t ane_src_count(struct ane_nn *nn);
-uint32_t ane_dst_count(struct ane_nn *nn);
+#define to_anec(nn)	  (&nn->anec)
+#define ane_src_count(nn) (to_anec(nn)->src_count)
+#define ane_dst_count(nn) (to_anec(nn)->dst_count)
 
+#define LIBANE_IDX_SAF(func, nn, idx, ...)              \
+	({                                              \
+		LIBANE_STATIC_ASSERT(idx < TILE_COUNT); \
+		func(nn, __VA_ARGS__, idx);             \
+	})
+
+// clang-format off
 void __ane_send(struct ane_nn *nn, void *from, const int idx);
 void __ane_read(struct ane_nn *nn, void *to, const int idx);
+#define ane_send(nn, from, idx) LIBANE_IDX_SAF(__ane_send, nn, idx, from)
+#define ane_read(nn, to, idx)	LIBANE_IDX_SAF(__ane_read, nn, idx, to)
 
 void __ane_tile_send(struct ane_nn *nn, void *from, const int idx);
 void __ane_tile_read(struct ane_nn *nn, void *to, const int idx);
-
-#define ane_send(nn, from, idx)                  \
-	({                                       \
-		STATIC_ASSERT(idx < TILE_COUNT); \
-		__ane_send(nn, from, idx);       \
-	})
-
-#define ane_read(nn, to, idx)                    \
-	({                                       \
-		STATIC_ASSERT(idx < TILE_COUNT); \
-		__ane_read(nn, to, idx);         \
-	})
-
-#define ane_tile_send(nn, from, idx)             \
-	({                                       \
-		STATIC_ASSERT(idx < TILE_COUNT); \
-		__ane_tile_send(nn, from, idx);  \
-	})
-
-#define ane_tile_read(nn, to, idx)               \
-	({                                       \
-		STATIC_ASSERT(idx < TILE_COUNT); \
-		__ane_tile_read(nn, to, idx);    \
-	})
+#define ane_tile_send(nn, from, idx) LIBANE_IDX_SAF(__ane_tile_send, nn, idx, from)
+#define ane_tile_read(nn, to, idx)   LIBANE_IDX_SAF(__ane_tile_read, nn, idx, to)
 
 void *__ane_src_chan(struct ane_nn *nn, const int idx);
 void *__ane_dst_chan(struct ane_nn *nn, const int idx);
+#define ane_src_chan(nn, idx) LIBANE_IDX_SAF(__ane_src_chan, nn, idx)
+#define ane_dst_chan(nn, idx) LIBANE_IDX_SAF(__ane_dst_chan, nn, idx)
 
 uint64_t __ane_src_size(struct ane_nn *nn, const int idx);
 uint64_t __ane_dst_size(struct ane_nn *nn, const int idx);
+#define ane_src_size(nn, idx) LIBANE_IDX_SAF(__ane_src_size, nn, idx)
+#define ane_dst_size(nn, idx) LIBANE_IDX_SAF(__ane_dst_size, nn, idx)
 
-#define ane_src_chan(nn, idx)                    \
-	({                                       \
-		STATIC_ASSERT(idx < TILE_COUNT); \
-		__ane_src_chan(nn, idx);         \
-	})
+uint64_t __ane_src_shape_n(struct ane_nn *nn, const int idx);
+uint64_t __ane_src_shape_c(struct ane_nn *nn, const int idx);
+uint64_t __ane_src_shape_h(struct ane_nn *nn, const int idx);
+uint64_t __ane_src_shape_w(struct ane_nn *nn, const int idx);
+#define ane_src_shape_n(nn, idx) LIBANE_IDX_SAF(__ane_src_shape_n, nn, idx)
+#define ane_src_shape_c(nn, idx) LIBANE_IDX_SAF(__ane_src_shape_c, nn, idx)
+#define ane_src_shape_h(nn, idx) LIBANE_IDX_SAF(__ane_src_shape_h, nn, idx)
+#define ane_src_shape_w(nn, idx) LIBANE_IDX_SAF(__ane_src_shape_w, nn, idx)
 
-#define ane_dst_chan(nn, idx)                    \
-	({                                       \
-		STATIC_ASSERT(idx < TILE_COUNT); \
-		__ane_dst_chan(nn, idx);         \
-	})
-
-#define ane_src_size(nn, idx)                    \
-	({                                       \
-		STATIC_ASSERT(idx < TILE_COUNT); \
-		__ane_src_size(nn, idx);         \
-	})
-
-#define ane_dst_size(nn, idx)                    \
-	({                                       \
-		STATIC_ASSERT(idx < TILE_COUNT); \
-		__ane_dst_size(nn, idx);         \
-	})
+uint64_t __ane_dst_shape_n(struct ane_nn *nn, const int idx);
+uint64_t __ane_dst_shape_c(struct ane_nn *nn, const int idx);
+uint64_t __ane_dst_shape_h(struct ane_nn *nn, const int idx);
+uint64_t __ane_dst_shape_w(struct ane_nn *nn, const int idx);
+#define ane_dst_shape_n(nn, idx) LIBANE_IDX_SAF(__ane_dst_shape_n, nn, idx)
+#define ane_dst_shape_c(nn, idx) LIBANE_IDX_SAF(__ane_dst_shape_c, nn, idx)
+#define ane_dst_shape_h(nn, idx) LIBANE_IDX_SAF(__ane_dst_shape_h, nn, idx)
+#define ane_dst_shape_w(nn, idx) LIBANE_IDX_SAF(__ane_dst_shape_w, nn, idx)
+// clang-format on
 
 void ane_tile(void *data, void *tile, const uint64_t N, const uint64_t C,
 	      const uint64_t H, const uint64_t W, const uint64_t P,

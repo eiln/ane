@@ -15,11 +15,11 @@
 #include "ane.h"
 #include "drm_ane.h"
 
-#if !defined(LIBANE_STFU_LOG) || !defined(LIBANE_STFU_ERR)
+#if !defined(LIBANE_CONFIG_STFU_LOG) || !defined(LIBANE_CONFIG_STFU_ERR)
 #include <stdio.h>
 #endif
 
-#ifndef LIBANE_STFU_LOG
+#ifndef LIBANE_CONFIG_STFU_LOG
 #define ane_log(a, ...) printf("LIBANE: LOG: " a, ##__VA_ARGS__)
 #else
 #define ane_log(...) \
@@ -27,17 +27,13 @@
 	} while (0)
 #endif
 
-#ifndef LIBANE_STFU_ERR
+#ifndef LIBANE_CONFIG_STFU_ERR
 #define ane_err(a, ...) fprintf(stderr, "LIBANE: ERR: " a, ##__VA_ARGS__)
 #else
 #define ane_err(...) \
 	do {         \
 	} while (0)
 #endif
-
-#define MAX_ANE_DEVICES	   2
-#define MAX_NODE_LEN	   30
-#define MAX_NODE_COUNT	   64
 
 #define TILE_SHIFT	   0xEUL
 #define TILE_SIZE	   0x4000UL
@@ -46,13 +42,13 @@
 #define tile_align(x)	   ((((uint64_t)(x)) + TILE_SIZE - 1) & -TILE_SIZE)
 #define tile_size(nn, bdx) (tile_shift(to_anec(nn)->tiles[bdx]))
 
-#define ANEC_SIZE	   0x1000
-#define to_anec(nn)	   (&nn->model->anec)
-
-#define src_count(nn)	   (to_anec(nn)->src_count)
-#define dst_count(nn)	   (to_anec(nn)->dst_count)
-#define src_bdx(nn, idx)   (4 + to_anec(nn)->dst_count + idx)
+#define ANEC_HEADER_SIZE   0x800
+#define src_bdx(nn, idx)   (4 + ane_dst_count(nn) + idx)
 #define dst_bdx(nn, idx)   (4 + idx)
+
+#define MAX_ANE_DEVICES	   2
+#define MAX_NODE_LEN	   30
+#define MAX_NODE_COUNT	   64
 
 static inline void *ane_malloc(size_t size)
 {
@@ -106,33 +102,32 @@ static inline void set_nid(void *td, int nid)
 static inline void set_btsp_and_command(struct ane_nn *nn)
 {
 	const struct anec *anec = to_anec(nn);
-	const void *data = nn->model->data;
 
-	memcpy(nn->chans[0].map, data, anec->size);
+	memcpy(nn->chans[0].map, nn->data, anec->size);
 
 	/* do not fucking overflow */
-	memcpy(nn->btsp_chan.map, data, anec->td_size);
+	memcpy(nn->btsp_chan.map, nn->data, anec->td_size);
 	set_nid(nn->btsp_chan.map, ANE_FIFO_NID);
 }
 
-static inline int bo_init(struct ane_device *ane, struct ane_bo *bo)
+static inline int bo_init(struct ane_nn *nn, struct ane_bo *bo)
 {
 	struct drm_ane_bo_init args = { .size = bo->size };
-	int err = ioctl(ane->fd, DRM_IOCTL_ANE_BO_INIT, &args);
+	int err = ioctl(nn->fd, DRM_IOCTL_ANE_BO_INIT, &args);
 	bo->handle = args.handle;
 	bo->offset = args.offset;
 	return err;
 }
 
-static inline int bo_free(struct ane_device *ane, struct ane_bo *bo)
+static inline int bo_free(struct ane_nn *nn, struct ane_bo *bo)
 {
 	struct drm_ane_bo_free args = { .handle = bo->handle };
-	return ioctl(ane->fd, DRM_IOCTL_ANE_BO_FREE, &args);
+	return ioctl(nn->fd, DRM_IOCTL_ANE_BO_FREE, &args);
 }
 
-static inline int bo_mmap(struct ane_device *ane, struct ane_bo *bo)
+static inline int bo_mmap(struct ane_nn *nn, struct ane_bo *bo)
 {
-	bo->map = mmap(0, bo->size, PROT_READ | PROT_WRITE, MAP_SHARED, ane->fd,
+	bo->map = mmap(0, bo->size, PROT_READ | PROT_WRITE, MAP_SHARED, nn->fd,
 		       bo->offset);
 
 	if (bo->map == MAP_FAILED) {
@@ -144,22 +139,22 @@ static inline int bo_mmap(struct ane_device *ane, struct ane_bo *bo)
 	return 0;
 }
 
-static inline int ane_bo_init(struct ane_device *ane, struct ane_bo *bo)
+static inline int ane_bo_init(struct ane_nn *nn, struct ane_bo *bo)
 {
 	int err;
 
 	if (!bo->size)
 		return -EINVAL;
 
-	err = bo_init(ane, bo);
+	err = bo_init(nn, bo);
 	if (err < 0) {
 		ane_err("bo_init failed with 0x%x\n", err);
 		goto error;
 	}
 
-	err = bo_mmap(ane, bo);
+	err = bo_mmap(nn, bo);
 	if (err < 0) {
-		bo_free(ane, bo);
+		bo_free(nn, bo);
 		ane_err("bo_mmap failed with 0x%x\n", err);
 		goto error;
 	}
@@ -172,25 +167,25 @@ error:
 	return err;
 }
 
-static inline void ane_bo_free(struct ane_device *ane, struct ane_bo *bo)
+static inline void ane_bo_free(struct ane_nn *nn, struct ane_bo *bo)
 {
 	if (bo->map) {
 		munmap(bo->map, bo->size);
-		bo_free(ane, bo);
+		bo_free(nn, bo);
 	}
 	bo->map = NULL;
 }
 
-static inline void ane_chan_free(struct ane_device *ane, struct ane_nn *nn)
+static inline void ane_chan_free(struct ane_nn *nn)
 {
-	ane_bo_free(ane, &nn->btsp_chan);
+	ane_bo_free(nn, &nn->btsp_chan);
 
 	for (int bdx = 0; bdx < ANE_TILE_COUNT; bdx++) {
-		ane_bo_free(ane, &nn->chans[bdx]);
+		ane_bo_free(nn, &nn->chans[bdx]);
 	}
 }
 
-static inline int ane_chan_init(struct ane_device *ane, struct ane_nn *nn)
+static inline int ane_chan_init(struct ane_nn *nn)
 {
 	const struct anec *anec = to_anec(nn);
 	struct ane_bo *bo;
@@ -200,7 +195,7 @@ static inline int ane_chan_init(struct ane_device *ane, struct ane_nn *nn)
 		if (anec->tiles[bdx]) {
 			bo = &nn->chans[bdx];
 			bo->size = tile_size(nn, bdx);
-			err = ane_bo_init(ane, bo);
+			err = ane_bo_init(nn, bo);
 			if (err < 0)
 				goto error;
 		}
@@ -208,7 +203,7 @@ static inline int ane_chan_init(struct ane_device *ane, struct ane_nn *nn)
 
 	bo = &nn->btsp_chan;
 	bo->size = tile_align(anec->td_size);
-	err = ane_bo_init(ane, bo);
+	err = ane_bo_init(nn, bo);
 	if (err < 0)
 		goto error;
 
@@ -218,7 +213,7 @@ static inline int ane_chan_init(struct ane_device *ane, struct ane_nn *nn)
 
 error:
 	ane_err("failed to init memory-mapped channels\n");
-	ane_chan_free(ane, nn);
+	ane_chan_free(nn);
 	return err;
 }
 
@@ -377,104 +372,90 @@ void ane_close(int fd)
 	}
 }
 
-struct ane_model *ane_model_init(const char *path)
+static inline int ane_device_open(struct ane_nn *nn, int dev_id)
 {
-	struct ane_model *model = ane_zmalloc(sizeof(struct ane_model));
-	struct anec *anec = NULL;
-	if (!model) {
-		return NULL;
-	}
-
-	anec = &model->anec;
-
-	if (ane_fread(path, anec, sizeof(struct anec)) < 0) {
-		free(model);
-		return NULL;
-	}
-
-	model->data = ane_zmemalign(anec->size);
-	if (!model->data) {
-		free(model);
-		return NULL;
-	}
-
-	if (ane_pread(path, model->data, anec->size, ANEC_SIZE) < 0) {
-		free(model->data);
-		free(model);
-		return NULL;
-	}
-
-	return model;
-}
-
-void ane_model_free(struct ane_model *model)
-{
-	free(model->data);
-	free(model);
-}
-
-struct ane_nn *__ane_init_from_model(struct ane_model *model, int dev_id)
-{
-	struct ane_nn *nn = NULL;
-
 	int fd = ane_open(dev_id);
 	if (fd < 0) {
-		return NULL;
+		return -EINVAL;
 	}
 
-	nn = ane_zmalloc(sizeof(struct ane_nn));
-	if (nn == NULL) {
-		ane_close(fd);
-		return NULL;
+	nn->fd = fd;
+
+	return 0;
+}
+
+static inline void ane_device_close(struct ane_nn *nn)
+{
+	ane_close(nn->fd);
+	nn->fd = 0;
+}
+
+static inline int ane_model_init(struct ane_nn *nn, const char *path)
+{
+	struct anec *anec = to_anec(nn);
+
+	if (ane_fread(path, anec, sizeof(struct anec)) < 0) {
+		return -EINVAL;
 	}
 
-	nn->model = model;
-	nn->ane.fd = fd;
-
-	if (ane_chan_init(&nn->ane, nn) < 0) {
-		free(nn);
-		ane_close(fd);
-		return NULL;
+	if (!anec->size) {
+		return -EINVAL;
 	}
 
-	ane_log("loaded model @ %p!\n", (void *)(nn));
+	nn->data = ane_zmemalign(anec->size);
+	if (!nn->data) {
+		return -ENOMEM;
+	}
 
-	return nn;
+	if (ane_pread(path, nn->data, anec->size, ANEC_HEADER_SIZE) < 0) {
+		free(nn->data);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static inline void ane_model_free(struct ane_nn *nn)
+{
+	free(nn->data);
 }
 
 struct ane_nn *__ane_init(const char *path, int dev_id)
 {
-	struct ane_nn *nn = NULL;
-
-	struct ane_model *model = ane_model_init(path);
-	if (model == NULL) {
-		ane_err("failed to load model at %s\n", path);
+	struct ane_nn *nn = ane_zmalloc(sizeof(struct ane_nn));
+	if (!nn) {
+		ane_err("failed to alloc mem for nn struct\n");
 		return NULL;
 	}
 
-	nn = __ane_init_from_model(model, dev_id);
-	if (nn == NULL) {
-		ane_model_free(model);
+	if (ane_model_init(nn, path) < 0) {
+		ane_err("failed to load model at %s\n", path);
+		free(nn);
+		return NULL;
+	}
+
+	if (ane_device_open(nn, dev_id) < 0) {
+		ane_err("failed to open device with dev_id %d\n", dev_id);
+		ane_model_free(nn);
+		free(nn);
+		return NULL;
+	}
+
+	if (ane_chan_init(nn) < 0) {
+		ane_device_close(nn);
+		ane_model_free(nn);
+		free(nn);
 		return NULL;
 	}
 
 	return nn;
 }
 
-void __ane_free_from_model(struct ane_nn *nn)
-{
-	ane_log("freeing model @ %p!\n", (void *)(nn));
-	ane_chan_free(&nn->ane, nn);
-	ane_close(nn->ane.fd);
-	free(nn);
-}
-
 void __ane_free(struct ane_nn *nn)
 {
-	ane_log("freeing model @ %p!\n", (void *)(nn));
-	ane_chan_free(&nn->ane, nn);
-	ane_close(nn->ane.fd);
-	ane_model_free(nn->model);
+	ane_chan_free(nn);
+	ane_device_close(nn);
+	ane_model_free(nn);
 	free(nn);
 }
 
@@ -496,25 +477,15 @@ int ane_exec(struct ane_nn *nn)
 	}
 	args.btsp_handle = nn->btsp_chan.handle;
 
-	return ioctl(nn->ane.fd, DRM_IOCTL_ANE_SUBMIT, &args);
+	return ioctl(nn->fd, DRM_IOCTL_ANE_SUBMIT, &args);
 }
 
-uint32_t ane_src_count(struct ane_nn *nn)
-{
-	return to_anec(nn)->src_count;
-}
-
-uint32_t ane_dst_count(struct ane_nn *nn)
-{
-	return to_anec(nn)->dst_count;
-}
-
-#ifdef LIBANE_INDEX_CHECK
+#ifdef LIBANE_CONFIG_INDEX_CHECK
 #define SRC_INDEX_CHECK(nn, idx, ret)                                              \
 	({                                                                         \
-		if (idx >= src_count(nn)) {                                        \
+		if (idx >= ane_src_count(nn)) {                                    \
 			ane_err("attempted to index %d but max is %d; bailing.\n", \
-				idx, src_count(nn));                               \
+				idx, ane_src_count(nn));                           \
 			return ret;                                                \
 		}                                                                  \
 	})
@@ -522,14 +493,14 @@ uint32_t ane_dst_count(struct ane_nn *nn)
 #define SRC_INDEX_CHECK(nn, idx, ret) \
 	do {                          \
 	} while (0)
-#endif /* LIBANE_INDEX_CHECK */
+#endif /* LIBANE_CONFIG_INDEX_CHECK */
 
-#ifdef LIBANE_INDEX_CHECK
+#ifdef LIBANE_CONFIG_INDEX_CHECK
 #define DST_INDEX_CHECK(nn, idx, ret)                                              \
 	({                                                                         \
-		if (idx >= dst_count(nn)) {                                        \
+		if (idx >= ane_dst_count(nn)) {                                    \
 			ane_err("attempted to index %d but max is %d; bailing.\n", \
-				idx, dst_count(nn));                               \
+				idx, ane_dst_count(nn));                           \
 			return ret;                                                \
 		}                                                                  \
 	})
@@ -537,7 +508,7 @@ uint32_t ane_dst_count(struct ane_nn *nn)
 #define DST_INDEX_CHECK(nn, idx, ret) \
 	do {                          \
 	} while (0)
-#endif /* LIBANE_INDEX_CHECK */
+#endif /* LIBANE_CONFIG_INDEX_CHECK */
 
 void __ane_send(struct ane_nn *nn, void *from, const int idx)
 {
@@ -575,6 +546,54 @@ uint64_t __ane_dst_size(struct ane_nn *nn, const int idx)
 {
 	DST_INDEX_CHECK(nn, idx, 0);
 	return tile_size(nn, dst_bdx(nn, idx));
+}
+
+uint64_t __ane_src_shape_n(struct ane_nn *nn, const int idx)
+{
+	SRC_INDEX_CHECK(nn, idx, 0);
+	return to_anec(nn)->nchw[src_bdx(nn, idx)][0];
+}
+
+uint64_t __ane_src_shape_c(struct ane_nn *nn, const int idx)
+{
+	SRC_INDEX_CHECK(nn, idx, 0);
+	return to_anec(nn)->nchw[src_bdx(nn, idx)][1];
+}
+
+uint64_t __ane_src_shape_h(struct ane_nn *nn, const int idx)
+{
+	SRC_INDEX_CHECK(nn, idx, 0);
+	return to_anec(nn)->nchw[src_bdx(nn, idx)][2];
+}
+
+uint64_t __ane_src_shape_w(struct ane_nn *nn, const int idx)
+{
+	SRC_INDEX_CHECK(nn, idx, 0);
+	return to_anec(nn)->nchw[src_bdx(nn, idx)][3];
+}
+
+uint64_t __ane_dst_shape_n(struct ane_nn *nn, const int idx)
+{
+	DST_INDEX_CHECK(nn, idx, 0);
+	return to_anec(nn)->nchw[dst_bdx(nn, idx)][0];
+}
+
+uint64_t __ane_dst_shape_c(struct ane_nn *nn, const int idx)
+{
+	DST_INDEX_CHECK(nn, idx, 0);
+	return to_anec(nn)->nchw[dst_bdx(nn, idx)][1];
+}
+
+uint64_t __ane_dst_shape_h(struct ane_nn *nn, const int idx)
+{
+	DST_INDEX_CHECK(nn, idx, 0);
+	return to_anec(nn)->nchw[dst_bdx(nn, idx)][2];
+}
+
+uint64_t __ane_dst_shape_w(struct ane_nn *nn, const int idx)
+{
+	DST_INDEX_CHECK(nn, idx, 0);
+	return to_anec(nn)->nchw[dst_bdx(nn, idx)][3];
 }
 
 void ane_tile(void *data, void *tile, const uint64_t N, const uint64_t C,

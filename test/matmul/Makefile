@@ -1,5 +1,5 @@
 all:
-	anecc matmul.hwx
+	anecc matmul.hwx -w
 	gcc -I. -I/usr/include/libane main.c -o main.out -lane
 
 clean:

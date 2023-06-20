@@ -1,21 +1,17 @@
 LIB_NAME = libane
 
 CC = gcc
-CFLAGS = -I. -I./include -Wall -Werror -Wextra \
+CFLAGS = -I. -Wall -Werror -Wextra \
 	-Wdeclaration-after-statement \
-	-O2 -std=gnu99
+	-O3 -std=gnu99
 
 UAPI_PATH = -I/home/eileen/ane/ane/src/include
 LIBS = -I/usr/include/libdrm $(UAPI_PATH)
 
-BUILD_DIR = build
-SRC_DIR = src
+BUILD_DIR = .
+SRC_DIR = .
 
-OBJECTS = $(BUILD_DIR)/ane.o \
-	  $(BUILD_DIR)/ane_chan.o \
-	  $(BUILD_DIR)/ane_device.o \
-	  $(BUILD_DIR)/ane_model.o \
-	  $(BUILD_DIR)/ane_tile.o
+OBJECTS = $(BUILD_DIR)/ane.o
 
 .PHONY: libane install uninstall clean
 
@@ -30,11 +26,11 @@ $(BUILD_DIR)/%.o : $(SRC_DIR)/%.c
 install: libane
 	install $(BUILD_DIR)/${LIB_NAME}.a ${DESTDIR}/usr/lib
 	mkdir -p ${DESTDIR}/usr/include/${LIB_NAME}
-	cp -r include/*.h ${DESTDIR}/usr/include/${LIB_NAME}
+	cp ane.h ane_f16.h ${DESTDIR}/usr/include/${LIB_NAME}
 
 uninstall:
 	rm -f ${DESTDIR}/usr/lib/${LIB_NAME}.a
 	rm -rf ${DESTDIR}/usr/include/${LIB_NAME}
 
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -f *.o *.a

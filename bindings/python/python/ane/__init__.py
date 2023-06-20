@@ -6,7 +6,8 @@
 import atexit
 import ctypes
 import numpy as np
-from ctypes import c_void_p, c_ulong
+from ctypes import c_void_p
+from construct import Struct, Array, Int32ul, Int64ul
 
 class _Driver:
 	def __init__(self, lib_path):
@@ -17,7 +18,6 @@ class _Driver:
 		self.lib.pyane_exec.argtypes = [c_void_p]
 		self.lib.pyane_send.argtypes = [c_void_p] + [c_void_p] * 0x20
 		self.lib.pyane_read.argtypes = [c_void_p] + [c_void_p] * 0x20
-		self.lib.pyane_info.argtypes = [c_void_p] + [ctypes.POINTER(c_ulong)] * (2 + (2 * 0x20 * 6))
 		self.handles = {}
 		atexit.register(self.cleanup)
 
@@ -35,13 +35,12 @@ class model:
 	def __init__(self, path, dev_id=0, lib_path="/usr/lib/libane_python.so"):
 		self.driver = _Driver(lib_path)
 		self.handle = self.driver.register(path, dev_id)
-		counts, nchws = [c_ulong(), c_ulong()], [c_ulong() for x in range(2 * 0x20 * 6)]
-		self.driver.lib.pyane_info(self.handle, *[ctypes.byref(x) for x in counts + nchws])
-		self.src_count, self.dst_count = counts[0].value, counts[1].value
-		self.src_nchw = tuple([tuple(x.value for x in nchws[n*6:(n+1)*6]) for n in range(self.src_count)])
-		self.dst_nchw = tuple([tuple(x.value for x in nchws[n*6:(n+1)*6]) for n in range(0x20, 0x20 + self.dst_count)])
+		fmt = Struct("size" / Int64ul,"td_size" / Int32ul, "td_count" / Int32ul, "tsk_size" / Int64ul, "krn_size" / Int64ul, "src_count" / Int32ul, "dst_count" / Int32ul, "tiles" / Array(0x20, Int32ul), "nchw" / Array(0x20 * 6, Int64ul))
+		res = fmt.parse(open(path, "rb").read()[:fmt.sizeof()])
+		self.src_count, self.dst_count = res.src_count, res.dst_count
+		self.dst_nchw, self.src_nchw = [tuple([tuple(x for x in res.nchw[(base+n)*6:(base+n+1)*6]) for n in range(count)]) for (base, count) in ((4, res.dst_count), (4 + res.dst_count, res.src_count))]
 		self.outputs = [ctypes.create_string_buffer(((nchw[0]*nchw[1]*nchw[4]) + 0x3fff) & -0x4000) for nchw in self.dst_nchw]
-		self.inputs_pad, self.outputs_pad = [b''] * (0x20 - self.src_count), [b''] * (0x20 - self.dst_count)
+		self.inputs_pad, self.outputs_pad = [b''] * (0x20 - res.src_count), [b''] * (0x20 - res.dst_count)
 
 	def predict(self, inarrs):  # list of numpy arrays
 		assert(len(inarrs) == self.src_count)

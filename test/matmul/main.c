@@ -14,16 +14,19 @@ int main(void)
 
 	float A[] = { 0.11, 0.12, 0.13,
                       0.21, 0.22, 0.23 };
-	float_to_half_c_array(A, Ah);
+	uint16_t Ah[6];
+	ane_f32_to_f16_row(A, Ah, 6);
 
 	float B[] = { 1011, 1012,
 	              1021, 1022,
 	              1031, 1032 };
-	float_to_half_c_array(B, Bh);
+	uint16_t Bh[6];
+	ane_f32_to_f16_row(B, Bh, 6);
 
 	float C[] = { 0.00, 0.00,
                       0.00, 0.00 };
-	init_half_array(Ch, sizeof(C) / sizeof(float));
+	float Cf[4];
+	uint16_t Ch[4];
 
 	struct ane_nn *nn = ane_init("matmul.anec");
 	if (nn == NULL) {
@@ -38,7 +41,7 @@ int main(void)
 
 	ane_tile_read(nn, Ch, 0);
 
-	half_to_float_c_array(Ch, Cf);
+	ane_f16_to_f32_row(Ch, Cf, 4);
 	printf("[ %g, %g\n", Cf[0], Cf[1]);
 	printf("  %g, %g ]\n", Cf[2], Cf[3]);
 

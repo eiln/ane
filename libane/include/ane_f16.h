@@ -4,57 +4,108 @@
 #ifndef __ANE_F16_H__
 #define __ANE_F16_H__
 
-/* credits to
- * https://stackoverflow.com/a/60047308/20891128
- *
- * IEEE-754 16-bit floating-point format (without infinity):
- * 1-5-10, exp-15, +-131008.0, +-6.1035156E-5, +-5.9604645E-8, 3.311 digits
- */
+#include <math.h>
+#include <stdint.h>
 
-static inline uint32_t __cast_as_uint(const float x)
+/* FP16 <-> FP32 */
+/* ref: https://github.com/ggerganov/ggml */
+/* ref: https://github.com/Maratyszcza/FP16 */
+
+static inline float f32_from_bits(uint32_t w)
 {
-	return *(uint32_t *)&x;
+	union {
+		uint32_t as_bits;
+		float as_value;
+	} f32;
+	f32.as_bits = w;
+	return f32.as_value;
 }
 
-static inline float __cast_as_float(const uint32_t x)
+static inline uint32_t f32_to_bits(float f)
 {
-	return *(float *)&x;
+	union {
+		float as_value;
+		uint32_t as_bits;
+	} f32;
+	f32.as_value = f;
+	return f32.as_bits;
 }
 
-// clang-format off
-static inline float half_to_float(const uint16_t x)
+static inline float ane_compute_f16_to_f32(const uint16_t h)
 {
-	const uint32_t e = (x & 0x7C00) >> 10; // exponent
-	const uint32_t m = (x & 0x03FF) << 13; // mantissa
-	const uint32_t v = __cast_as_uint((float)m) >> 23; // evil log2 bit hack to count leading zeros in denormalized format
-	return __cast_as_float((x&0x8000)<<16 | (e!=0)*((e+112)<<23|m) | ((e==0)&(m!=0))*((v-37)<<23|((m<<(150-v))&0x007FE000))); // sign : normalized : denormalized
+	const uint32_t w = (uint32_t)h << 16;
+	const uint32_t sign = w & UINT32_C(0x80000000);
+	const uint32_t two_w = w + w;
+
+	const uint32_t exp_offset = UINT32_C(0xE0) << 23;
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) || \
+	defined(__GNUC__) && !defined(__STRICT_ANSI__)
+	const float exp_scale = 0x1.0p-112f;
+#else
+	const float exp_scale = f32_from_bits(UINT32_C(0x7800000));
+#endif
+	const float normalized_value =
+		f32_from_bits((two_w >> 4) + exp_offset) * exp_scale;
+
+	const uint32_t magic_mask = UINT32_C(126) << 23;
+	const float magic_bias = 0.5f;
+	const float denormalized_value =
+		f32_from_bits((two_w >> 17) | magic_mask) - magic_bias;
+
+	const uint32_t denormalized_cutoff = UINT32_C(1) << 27;
+	const uint32_t result = sign |
+				(two_w < denormalized_cutoff ?
+					 f32_to_bits(denormalized_value) :
+					 f32_to_bits(normalized_value));
+	return f32_from_bits(result);
 }
 
-static inline uint16_t float_to_half(const float x)
+static inline uint16_t ane_compute_f32_to_f16(const float f)
 {
-	const uint32_t b = __cast_as_uint(x) + 0x00001000; // round-to-nearest-even: add last bit after truncated mantissa
-	const uint32_t e = (b & 0x7F800000) >> 23; // exponent
-	const uint32_t m = b & 0x007FFFFF; // mantissa; in line below: 0x007FF000 = 0x00800000-0x00001000 = decimal indicator flag - initial rounding
-	return (b&0x80000000)>>16 | (e>112)*((((e-112)<<10)&0x7C00)|m>>13) | ((e<113)&(e>101))*((((0x007FF000+m)>>(125-e))+1)>>1) | (e>143)*0x7FFF; // sign : normalized : denormalized : saturate
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) || \
+	defined(__GNUC__) && !defined(__STRICT_ANSI__)
+	const float scale_to_inf = 0x1.0p+112f;
+	const float scale_to_zero = 0x1.0p-110f;
+#else
+	const float scale_to_inf = f32_from_bits(UINT32_C(0x77800000));
+	const float scale_to_zero = f32_from_bits(UINT32_C(0x08800000));
+#endif
+	float base = (fabsf(f) * scale_to_inf) * scale_to_zero;
+
+	const uint32_t w = f32_to_bits(f);
+	const uint32_t shl1_w = w + w;
+	const uint32_t sign = w & UINT32_C(0x80000000);
+	uint32_t bias = shl1_w & UINT32_C(0xFF000000);
+	if (bias < UINT32_C(0x71000000)) {
+		bias = UINT32_C(0x71000000);
+	}
+
+	base = f32_from_bits((bias >> 1) + UINT32_C(0x07800000)) + base;
+	const uint32_t bits = f32_to_bits(base);
+	const uint32_t exp_bits = (bits >> 13) & UINT32_C(0x00007C00);
+	const uint32_t mantissa_bits = bits & UINT32_C(0x00000FFF);
+	const uint32_t nonsign = exp_bits + mantissa_bits;
+	return (sign >> 16) |
+	       (shl1_w > UINT32_C(0xFF000000) ? UINT16_C(0x7E00) : nonsign);
 }
-// clang-format on
 
-#define float_to_half_array(src, dst, elem)   \
-	uint16_t dst[(elem)];                 \
-	for (uint64_t i = 0; i < (elem); i++) \
-		dst[i] = float_to_half(src[i]);
+static inline void ane_f16_to_f32_row(const uint16_t *x, float *y,
+				      const uint64_t n)
+{
+	for (uint64_t i = 0; i < n; i++) {
+		y[i] = ane_compute_f16_to_f32(x[i]);
+	}
+}
 
-#define half_to_float_array(src, dst, elem)   \
-	float dst[(elem)];                    \
-	for (uint64_t i = 0; i < (elem); i++) \
-		dst[i] = half_to_float(src[i]);
+static inline void ane_f32_to_f16_row(const float *x, uint16_t *y,
+				      const uint64_t n)
+{
+	for (uint64_t i = 0; i < n; i++) {
+		y[i] = ane_compute_f32_to_f16(x[i]);
+	}
+}
 
-#define float_to_half_c_array(src, dst) \
-	float_to_half_array(src, dst, (sizeof(src) / sizeof(float)))
-
-#define half_to_float_c_array(src, dst) \
-	half_to_float_array(src, dst, (sizeof(src) / sizeof(uint16_t)))
-
-#define init_half_array(name, elem) uint16_t name[(elem)]
+#define ane_f16_to_f32(x) ane_compute_f16_to_f32(x)
+#define ane_f32_to_f16(x) ane_compute_f32_to_f16(x)
 
 #endif /* __ANE_F16_H__ */

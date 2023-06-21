@@ -12,36 +12,36 @@
 struct ane_device {
 	struct drm_device drm;
 	struct device *dev;
-	const struct ane_hw *hw; /* HW-specific data */
+	const struct ane_hw *hw;
 
-	struct device **pd_dev; /* Engine/RPM power domains */
+	struct device **pd_dev;
 	struct device_link **pd_link;
 	int pd_count;
 
-	void __iomem *engine; /* Engine MMIO */
-	void __iomem *dart0; /* Main IOMMU MMIO shared with IOMMU driver */
-	void __iomem *dart1; /* Auxiliary IOMMU for DMA */
-	void __iomem *dart2; /* Auxiliary IOMMU for DMA */
+	void __iomem *engine;
+	void __iomem *dart0;
+	void __iomem *dart1;
+	void __iomem *dart2;
 
-	struct drm_mm mm; /* IOMMU space (iova) allocator */
+	struct drm_mm mm;
 	struct iommu_domain *domain;
-	unsigned long shift; /* IOMMU page shift */
+	unsigned long shift;
 
 	int irq;
-	int dart_irq; /* IOMMU IRQ shared with IOMMU driver */
+	int dart_irq;
 
-	struct mutex iommu_lock; /* Protects IOMMU space */
-	struct mutex engine_lock; /* Protects engine queue */
+	struct mutex iommu_lock;
+	struct mutex engine_lock;
 };
 
 struct ane_hw {
 	struct {
 		u64 vm_base;
 		u64 vm_size;
-		u32 ttbr; /* TTBR offset */
-		u32 select; /* Stream select offset */
-		u32 command; /* Stream command offset */
-		u32 invalidate; /* Stream command TLB invalidation bit */
+		u32 ttbr;
+		u32 select;
+		u32 command;
+		u32 invalidate;
 	} dart;
 };
 

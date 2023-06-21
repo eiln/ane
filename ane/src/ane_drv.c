@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only OR MIT
 /* Copyright 2022 Eileen Yoon <eyn@gmx.com> */
 
-#define pr_fmt(fmt) "%s: %s: " fmt, KBUILD_MODNAME, __func__
-
 #include <linux/interrupt.h>
 #include <linux/iommu.h>
 #include <linux/module.h>

@@ -8,7 +8,6 @@
 extern "C" {
 #endif
 
-/* shared constants */
 #define ANE_TILE_COUNT	0x20
 #define ANE_FIFO_NID	0x40
 #define ANE_CMD_GRAN	0x10

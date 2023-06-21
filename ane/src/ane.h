@@ -7,7 +7,7 @@
 #include <drm/drm_device.h>
 #include <drm/drm_mm.h>
 
-#include "include/drm_ane.h"
+#include <uapi/drm/ane_accel.h>
 
 struct ane_device {
 	struct drm_device drm;

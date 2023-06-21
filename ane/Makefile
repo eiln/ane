@@ -7,6 +7,7 @@ else
  	PWD := $(shell pwd)
 
 default:
+	sudo cp ./src/uapi/drm/ane_accel.h /lib/modules/$(shell uname -r)/build/include/uapi/drm/
 	make -C $(KERNELDIR) M=$(PWD) modules
 
 install:

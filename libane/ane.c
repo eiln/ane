@@ -12,8 +12,8 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#include <ane_accel.h>
 #include "ane.h"
-#include "drm_ane.h"
 
 #if !defined(LIBANE_CONFIG_STFU_LOG) || !defined(LIBANE_CONFIG_STFU_ERR)
 #include <stdio.h>

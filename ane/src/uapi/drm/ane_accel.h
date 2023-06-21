@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only OR MIT
 /* Copyright 2022 Eileen Yoon <eyn@gmx.com> */
 
-#ifndef __DRM_ANE_H__
-#define __DRM_ANE_H__
+#ifndef __ANE_ACCEL_H__
+#define __ANE_ACCEL_H__
 
 #if defined(__cplusplus)
 extern "C" {
@@ -48,4 +48,4 @@ struct drm_ane_submit {
 }
 #endif
 
-#endif /* __DRM_ANE_H__ */
+#endif /* __ANE_ACCEL_H__ */

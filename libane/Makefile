@@ -5,8 +5,7 @@ CFLAGS = -I. -Wall -Werror -Wextra \
 	-Wdeclaration-after-statement \
 	-O3 -std=gnu99
 
-UAPI_PATH = -I/home/eileen/ane/ane/src/include
-LIBS = -I/usr/include/libdrm $(UAPI_PATH)
+LIBS = -I/usr/include/libdrm -I/lib/modules/$(shell uname -r)/build/include/uapi/drm
 
 BUILD_DIR = .
 SRC_DIR = .

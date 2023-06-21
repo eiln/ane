@@ -668,7 +668,8 @@ void ane_untile(void *data, void *tile, const uint64_t N, const uint64_t C,
 	}
 }
 
-void __ane_tile_send(struct ane_nn *nn, void *from, const uint32_t idx)
+static inline void ___ane_tile_send(struct ane_nn *nn, void *from,
+				    const uint32_t idx)
 {
 	const struct anec *anec = to_anec(nn);
 	const int bdx = src_bdx(nn, idx);
@@ -682,7 +683,8 @@ void __ane_tile_send(struct ane_nn *nn, void *from, const uint32_t idx)
 	memcpy(nn->chans[bdx].map, tile, tile_size(nn, bdx));
 }
 
-void __ane_tile_read(struct ane_nn *nn, void *to, const uint32_t idx)
+static inline void ___ane_tile_read(struct ane_nn *nn, void *to,
+				    const uint32_t idx)
 {
 	const struct anec *anec = to_anec(nn);
 	const int bdx = dst_bdx(nn, idx);
@@ -693,4 +695,16 @@ void __ane_tile_read(struct ane_nn *nn, void *to, const uint32_t idx)
 	ane_untile(to, tile, anec->nchw[bdx][0], anec->nchw[bdx][1],
 		   anec->nchw[bdx][2], anec->nchw[bdx][3], anec->nchw[bdx][4],
 		   anec->nchw[bdx][5]);
+}
+
+void __ane_tile_send(struct ane_nn *nn, void *from, const uint32_t idx)
+{
+	SRC_INDEX_CHECK(nn, idx, );
+	___ane_tile_send(nn, from, idx);
+}
+
+void __ane_tile_read(struct ane_nn *nn, void *to, const uint32_t idx)
+{
+	DST_INDEX_CHECK(nn, idx, );
+	___ane_tile_read(nn, to, idx);
 }

@@ -480,7 +480,7 @@ int ane_exec(struct ane_nn *nn)
 	return ioctl(nn->fd, DRM_IOCTL_ANE_SUBMIT, &args);
 }
 
-#ifdef LIBANE_CONFIG_INDEX_CHECK
+#ifndef LIBANE_CONFIG_NO_INDEX_CHECK
 #define SRC_INDEX_CHECK(nn, idx, ret)                                              \
 	({                                                                         \
 		if (idx >= ane_src_count(nn)) {                                    \
@@ -493,9 +493,9 @@ int ane_exec(struct ane_nn *nn)
 #define SRC_INDEX_CHECK(nn, idx, ret) \
 	do {                          \
 	} while (0)
-#endif /* LIBANE_CONFIG_INDEX_CHECK */
+#endif /* LIBANE_CONFIG_NO_INDEX_CHECK */
 
-#ifdef LIBANE_CONFIG_INDEX_CHECK
+#ifndef LIBANE_CONFIG_NO_INDEX_CHECK
 #define DST_INDEX_CHECK(nn, idx, ret)                                              \
 	({                                                                         \
 		if (idx >= ane_dst_count(nn)) {                                    \
@@ -508,88 +508,106 @@ int ane_exec(struct ane_nn *nn)
 #define DST_INDEX_CHECK(nn, idx, ret) \
 	do {                          \
 	} while (0)
-#endif /* LIBANE_CONFIG_INDEX_CHECK */
+#endif /* LIBANE_CONFIG_NO_INDEX_CHECK */
 
-uint64_t __ane_src_size(struct ane_nn *nn, const int idx)
+uint64_t __ane_src_size(struct ane_nn *nn, const uint32_t idx)
 {
 	SRC_INDEX_CHECK(nn, idx, 0);
 	return tile_size(nn, src_bdx(nn, idx));
 }
 
-uint64_t __ane_dst_size(struct ane_nn *nn, const int idx)
+uint64_t __ane_dst_size(struct ane_nn *nn, const uint32_t idx)
 {
 	DST_INDEX_CHECK(nn, idx, 0);
 	return tile_size(nn, dst_bdx(nn, idx));
 }
 
-uint64_t __ane_src_shape_n(struct ane_nn *nn, const int idx)
+uint64_t __ane_src_elem(struct ane_nn *nn, const uint32_t idx)
+{
+	SRC_INDEX_CHECK(nn, idx, 0);
+	return to_anec(nn)->nchw[src_bdx(nn, idx)][0] *
+	       to_anec(nn)->nchw[src_bdx(nn, idx)][1] *
+	       to_anec(nn)->nchw[src_bdx(nn, idx)][2] *
+	       to_anec(nn)->nchw[src_bdx(nn, idx)][3];
+}
+
+uint64_t __ane_dst_elem(struct ane_nn *nn, const uint32_t idx)
+{
+	DST_INDEX_CHECK(nn, idx, 0);
+	return to_anec(nn)->nchw[dst_bdx(nn, idx)][0] *
+	       to_anec(nn)->nchw[dst_bdx(nn, idx)][1] *
+	       to_anec(nn)->nchw[dst_bdx(nn, idx)][2] *
+	       to_anec(nn)->nchw[dst_bdx(nn, idx)][3];
+}
+
+uint64_t __ane_src_shape_n(struct ane_nn *nn, const uint32_t idx)
 {
 	SRC_INDEX_CHECK(nn, idx, 0);
 	return to_anec(nn)->nchw[src_bdx(nn, idx)][0];
 }
 
-uint64_t __ane_src_shape_c(struct ane_nn *nn, const int idx)
+uint64_t __ane_src_shape_c(struct ane_nn *nn, const uint32_t idx)
 {
 	SRC_INDEX_CHECK(nn, idx, 0);
 	return to_anec(nn)->nchw[src_bdx(nn, idx)][1];
 }
 
-uint64_t __ane_src_shape_h(struct ane_nn *nn, const int idx)
+uint64_t __ane_src_shape_h(struct ane_nn *nn, const uint32_t idx)
 {
 	SRC_INDEX_CHECK(nn, idx, 0);
 	return to_anec(nn)->nchw[src_bdx(nn, idx)][2];
 }
 
-uint64_t __ane_src_shape_w(struct ane_nn *nn, const int idx)
+uint64_t __ane_src_shape_w(struct ane_nn *nn, const uint32_t idx)
 {
 	SRC_INDEX_CHECK(nn, idx, 0);
 	return to_anec(nn)->nchw[src_bdx(nn, idx)][3];
 }
 
-uint64_t __ane_dst_shape_n(struct ane_nn *nn, const int idx)
+uint64_t __ane_dst_shape_n(struct ane_nn *nn, const uint32_t idx)
 {
 	DST_INDEX_CHECK(nn, idx, 0);
 	return to_anec(nn)->nchw[dst_bdx(nn, idx)][0];
 }
 
-uint64_t __ane_dst_shape_c(struct ane_nn *nn, const int idx)
+uint64_t __ane_dst_shape_c(struct ane_nn *nn, const uint32_t idx)
 {
 	DST_INDEX_CHECK(nn, idx, 0);
 	return to_anec(nn)->nchw[dst_bdx(nn, idx)][1];
 }
 
-uint64_t __ane_dst_shape_h(struct ane_nn *nn, const int idx)
+uint64_t __ane_dst_shape_h(struct ane_nn *nn, const uint32_t idx)
 {
 	DST_INDEX_CHECK(nn, idx, 0);
 	return to_anec(nn)->nchw[dst_bdx(nn, idx)][2];
 }
 
-uint64_t __ane_dst_shape_w(struct ane_nn *nn, const int idx)
+uint64_t __ane_dst_shape_w(struct ane_nn *nn, const uint32_t idx)
 {
 	DST_INDEX_CHECK(nn, idx, 0);
 	return to_anec(nn)->nchw[dst_bdx(nn, idx)][3];
 }
 
-void *__ane_src_chan(struct ane_nn *nn, const int idx)
+void *__ane_src_chan(struct ane_nn *nn, const uint32_t idx)
 {
 	SRC_INDEX_CHECK(nn, idx, NULL);
 	return nn->chans[src_bdx(nn, idx)].map;
 }
 
-void *__ane_dst_chan(struct ane_nn *nn, const int idx)
+void *__ane_dst_chan(struct ane_nn *nn, const uint32_t idx)
 {
 	DST_INDEX_CHECK(nn, idx, NULL);
 	return nn->chans[dst_bdx(nn, idx)].map;
 }
 
-void __ane_send(struct ane_nn *nn, void *from, const int idx)
+void __ane_send(struct ane_nn *nn, void *from, const uint32_t idx)
 {
 	SRC_INDEX_CHECK(nn, idx, );
 	memcpy(nn->chans[src_bdx(nn, idx)].map, from,
 	       tile_size(nn, src_bdx(nn, idx)));
 }
 
-void __ane_read(struct ane_nn *nn, void *to, const int idx)
+void __ane_read(struct ane_nn *nn, void *to, const uint32_t idx)
 {
 	DST_INDEX_CHECK(nn, idx, );
 	memcpy(to, nn->chans[dst_bdx(nn, idx)].map,
@@ -650,7 +668,7 @@ void ane_untile(void *data, void *tile, const uint64_t N, const uint64_t C,
 	}
 }
 
-void __ane_tile_send(struct ane_nn *nn, void *from, const int idx)
+void __ane_tile_send(struct ane_nn *nn, void *from, const uint32_t idx)
 {
 	const struct anec *anec = to_anec(nn);
 	const int bdx = src_bdx(nn, idx);
@@ -664,7 +682,7 @@ void __ane_tile_send(struct ane_nn *nn, void *from, const int idx)
 	memcpy(nn->chans[bdx].map, tile, tile_size(nn, bdx));
 }
 
-void __ane_tile_read(struct ane_nn *nn, void *to, const int idx)
+void __ane_tile_read(struct ane_nn *nn, void *to, const uint32_t idx)
 {
 	const struct anec *anec = to_anec(nn);
 	const int bdx = dst_bdx(nn, idx);

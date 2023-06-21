@@ -8,6 +8,43 @@
 extern "C" {
 #endif
 
+/*
+// Asahi Neural Engine (ANE) Userspace Library
+//
+// USAGE:
+
+	Simply drop "ane.h" with libane.a (generated from ane.c).
+
+	#include "ane.h" // only requires <stdint.h>
+
+	int main(void)
+	{
+		struct ane_nn *nn = ane_init("model.anec"); // init network from anec format
+		if (!nn) {
+			printf("failed to load model\n");
+			return -1;
+		}
+
+		void *input0 = malloc(ane_src_size(nn, 0)); // get size of 0th index input
+		ane_send(nn, input0, 0); // send 0th index input to device
+		ane_send(nn, input1, 1); // send 1st index input to device
+
+		if (ane_exec(nn) < 0) { // call exec after sending all inputs
+			printf("execution failed\n");
+		}
+
+		ane_read(nn, output0, 0); // receive 0th index output from device
+
+		ane_free(nn); // inverse of ane_init()
+		return 0;
+	}
+
+	Compiles with gcc or g++:
+
+	gcc -I/usr/include/libane main.c /usr/lib/libane.a  # or -lane
+
+*/
+
 #include <stdint.h>
 
 #define TILE_COUNT 0x20

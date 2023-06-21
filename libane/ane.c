@@ -50,28 +50,28 @@
 #define MAX_NODE_LEN	   30
 #define MAX_NODE_COUNT	   64
 
-static inline void *ane_malloc(size_t size)
+static inline void *ane_malloc(const uint64_t size)
 {
 	void *ptr = malloc(size);
 	if (ptr == NULL) {
-		ane_err("failed to alloc size 0x%zx\n", size);
+		ane_err("failed to malloc size 0x%lx\n", size);
 		return NULL;
 	}
 	return ptr;
 }
 
-static inline void *ane_zmalloc(size_t size)
+static inline void *ane_zmalloc(const uint64_t size)
 {
 	void *ptr = malloc(size);
 	if (ptr == NULL) {
-		ane_err("failed to alloc size 0x%zx\n", size);
+		ane_err("failed to malloc size 0x%lx\n", size);
 		return NULL;
 	}
 	memset(ptr, 0, size);
 	return ptr;
 }
 
-static inline void *ane_memalign(size_t size)
+static inline void *ane_memalign(const uint64_t size)
 {
 	void *ptr = NULL;
 	if (posix_memalign(&ptr, TILE_SIZE, size)) {
@@ -81,11 +81,11 @@ static inline void *ane_memalign(size_t size)
 	return ptr;
 }
 
-static inline void *ane_zmemalign(size_t size)
+static inline void *ane_zmemalign(const uint64_t size)
 {
 	void *ptr = NULL;
 	if (posix_memalign(&ptr, TILE_SIZE, size)) {
-		ane_err("failed to memalign size 0x%zx\n", size);
+		ane_err("failed to memalign size 0x%lx\n", size);
 		return NULL;
 	}
 	memset(ptr, 0, size);
@@ -114,9 +114,14 @@ static inline int bo_init(struct ane_nn *nn, struct ane_bo *bo)
 {
 	struct drm_ane_bo_init args = { .size = bo->size };
 	int err = ioctl(nn->fd, DRM_IOCTL_ANE_BO_INIT, &args);
+	if (err < 0) {
+		ane_err("DRM_IOCTL_ANE_BO_INIT failed with 0x%x\n", err);
+		return -EINVAL;
+	}
+
 	bo->handle = args.handle;
 	bo->offset = args.offset;
-	return err;
+	return 0;
 }
 
 static inline int bo_free(struct ane_nn *nn, struct ane_bo *bo)
@@ -132,7 +137,7 @@ static inline int bo_mmap(struct ane_nn *nn, struct ane_bo *bo)
 
 	if (bo->map == MAP_FAILED) {
 		bo->map = NULL;
-		ane_err("failed to mmap bo\n");
+		ane_err("failed to mmap bo size 0x%lx\n", bo->size);
 		return -EINVAL;
 	}
 
@@ -148,14 +153,12 @@ static inline int ane_bo_init(struct ane_nn *nn, struct ane_bo *bo)
 
 	err = bo_init(nn, bo);
 	if (err < 0) {
-		ane_err("bo_init failed with 0x%x\n", err);
 		goto error;
 	}
 
 	err = bo_mmap(nn, bo);
 	if (err < 0) {
 		bo_free(nn, bo);
-		ane_err("bo_mmap failed with 0x%x\n", err);
 		goto error;
 	}
 
@@ -399,6 +402,7 @@ static inline int ane_model_init(struct ane_nn *nn, const char *path)
 	}
 
 	if (!anec->size) {
+		ane_err("invalid anec at %s\n", path);
 		return -EINVAL;
 	}
 
@@ -481,13 +485,13 @@ int ane_exec(struct ane_nn *nn)
 }
 
 #ifndef LIBANE_CONFIG_NO_INDEX_CHECK
-#define SRC_INDEX_CHECK(nn, idx, ret)                                              \
-	({                                                                         \
-		if (idx >= ane_src_count(nn)) {                                    \
-			ane_err("attempted to index %d but max is %d; bailing.\n", \
-				idx, ane_src_count(nn));                           \
-			return ret;                                                \
-		}                                                                  \
+#define SRC_INDEX_CHECK(nn, idx, ret)                                          \
+	({                                                                     \
+		if (idx >= ane_src_count(nn)) {                                \
+			ane_err("tried to index %d but max is %d; bailing.\n", \
+				idx, ane_src_count(nn));                       \
+			return ret;                                            \
+		}                                                              \
 	})
 #else
 #define SRC_INDEX_CHECK(nn, idx, ret) \
@@ -496,13 +500,13 @@ int ane_exec(struct ane_nn *nn)
 #endif /* LIBANE_CONFIG_NO_INDEX_CHECK */
 
 #ifndef LIBANE_CONFIG_NO_INDEX_CHECK
-#define DST_INDEX_CHECK(nn, idx, ret)                                              \
-	({                                                                         \
-		if (idx >= ane_dst_count(nn)) {                                    \
-			ane_err("attempted to index %d but max is %d; bailing.\n", \
-				idx, ane_dst_count(nn));                           \
-			return ret;                                                \
-		}                                                                  \
+#define DST_INDEX_CHECK(nn, idx, ret)                                          \
+	({                                                                     \
+		if (idx >= ane_dst_count(nn)) {                                \
+			ane_err("tried to index %d but max is %d; bailing.\n", \
+				idx, ane_dst_count(nn));                       \
+			return ret;                                            \
+		}                                                              \
 	})
 #else
 #define DST_INDEX_CHECK(nn, idx, ret) \

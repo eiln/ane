@@ -510,32 +510,6 @@ int ane_exec(struct ane_nn *nn)
 	} while (0)
 #endif /* LIBANE_CONFIG_INDEX_CHECK */
 
-void __ane_send(struct ane_nn *nn, void *from, const int idx)
-{
-	SRC_INDEX_CHECK(nn, idx, );
-	memcpy(nn->chans[src_bdx(nn, idx)].map, from,
-	       tile_size(nn, src_bdx(nn, idx)));
-}
-
-void __ane_read(struct ane_nn *nn, void *to, const int idx)
-{
-	DST_INDEX_CHECK(nn, idx, );
-	memcpy(to, nn->chans[dst_bdx(nn, idx)].map,
-	       tile_size(nn, dst_bdx(nn, idx)));
-}
-
-void *__ane_src_chan(struct ane_nn *nn, const int idx)
-{
-	SRC_INDEX_CHECK(nn, idx, NULL);
-	return nn->chans[src_bdx(nn, idx)].map;
-}
-
-void *__ane_dst_chan(struct ane_nn *nn, const int idx)
-{
-	DST_INDEX_CHECK(nn, idx, NULL);
-	return nn->chans[dst_bdx(nn, idx)].map;
-}
-
 uint64_t __ane_src_size(struct ane_nn *nn, const int idx)
 {
 	SRC_INDEX_CHECK(nn, idx, 0);
@@ -594,6 +568,32 @@ uint64_t __ane_dst_shape_w(struct ane_nn *nn, const int idx)
 {
 	DST_INDEX_CHECK(nn, idx, 0);
 	return to_anec(nn)->nchw[dst_bdx(nn, idx)][3];
+}
+
+void *__ane_src_chan(struct ane_nn *nn, const int idx)
+{
+	SRC_INDEX_CHECK(nn, idx, NULL);
+	return nn->chans[src_bdx(nn, idx)].map;
+}
+
+void *__ane_dst_chan(struct ane_nn *nn, const int idx)
+{
+	DST_INDEX_CHECK(nn, idx, NULL);
+	return nn->chans[dst_bdx(nn, idx)].map;
+}
+
+void __ane_send(struct ane_nn *nn, void *from, const int idx)
+{
+	SRC_INDEX_CHECK(nn, idx, );
+	memcpy(nn->chans[src_bdx(nn, idx)].map, from,
+	       tile_size(nn, src_bdx(nn, idx)));
+}
+
+void __ane_read(struct ane_nn *nn, void *to, const int idx)
+{
+	DST_INDEX_CHECK(nn, idx, );
+	memcpy(to, nn->chans[dst_bdx(nn, idx)].map,
+	       tile_size(nn, dst_bdx(nn, idx)));
 }
 
 void ane_tile(void *data, void *tile, const uint64_t N, const uint64_t C,

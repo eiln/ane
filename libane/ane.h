@@ -80,21 +80,6 @@ int ane_exec(struct ane_nn *nn);
 	})
 
 // clang-format off
-void __ane_send(struct ane_nn *nn, void *from, const int idx);
-void __ane_read(struct ane_nn *nn, void *to, const int idx);
-#define ane_send(nn, from, idx) LIBANE_IDX_SAF(__ane_send, nn, idx, from)
-#define ane_read(nn, to, idx)	LIBANE_IDX_SAF(__ane_read, nn, idx, to)
-
-void __ane_tile_send(struct ane_nn *nn, void *from, const int idx);
-void __ane_tile_read(struct ane_nn *nn, void *to, const int idx);
-#define ane_tile_send(nn, from, idx) LIBANE_IDX_SAF(__ane_tile_send, nn, idx, from)
-#define ane_tile_read(nn, to, idx)   LIBANE_IDX_SAF(__ane_tile_read, nn, idx, to)
-
-void *__ane_src_chan(struct ane_nn *nn, const int idx);
-void *__ane_dst_chan(struct ane_nn *nn, const int idx);
-#define ane_src_chan(nn, idx) LIBANE_IDX_SAF(__ane_src_chan, nn, idx)
-#define ane_dst_chan(nn, idx) LIBANE_IDX_SAF(__ane_dst_chan, nn, idx)
-
 uint64_t __ane_src_size(struct ane_nn *nn, const int idx);
 uint64_t __ane_dst_size(struct ane_nn *nn, const int idx);
 #define ane_src_size(nn, idx) LIBANE_IDX_SAF(__ane_src_size, nn, idx)
@@ -117,6 +102,21 @@ uint64_t __ane_dst_shape_w(struct ane_nn *nn, const int idx);
 #define ane_dst_shape_c(nn, idx) LIBANE_IDX_SAF(__ane_dst_shape_c, nn, idx)
 #define ane_dst_shape_h(nn, idx) LIBANE_IDX_SAF(__ane_dst_shape_h, nn, idx)
 #define ane_dst_shape_w(nn, idx) LIBANE_IDX_SAF(__ane_dst_shape_w, nn, idx)
+
+void *__ane_src_chan(struct ane_nn *nn, const int idx);
+void *__ane_dst_chan(struct ane_nn *nn, const int idx);
+#define ane_src_chan(nn, idx) LIBANE_IDX_SAF(__ane_src_chan, nn, idx)
+#define ane_dst_chan(nn, idx) LIBANE_IDX_SAF(__ane_dst_chan, nn, idx)
+
+void __ane_send(struct ane_nn *nn, void *from, const int idx);
+void __ane_read(struct ane_nn *nn, void *to, const int idx);
+#define ane_send(nn, from, idx) LIBANE_IDX_SAF(__ane_send, nn, idx, from)
+#define ane_read(nn, to, idx)	LIBANE_IDX_SAF(__ane_read, nn, idx, to)
+
+void __ane_tile_send(struct ane_nn *nn, void *from, const int idx);
+void __ane_tile_read(struct ane_nn *nn, void *to, const int idx);
+#define ane_tile_send(nn, from, idx) LIBANE_IDX_SAF(__ane_tile_send, nn, idx, from)
+#define ane_tile_read(nn, to, idx)   LIBANE_IDX_SAF(__ane_tile_read, nn, idx, to)
 // clang-format on
 
 void ane_tile(void *data, void *tile, const uint64_t N, const uint64_t C,

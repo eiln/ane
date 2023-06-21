@@ -25,18 +25,18 @@ struct anec {
 } __attribute__((__packed__, aligned(1)));
 
 struct ane_bo {
-	void *map;
-	uint64_t size;
-	uint32_t handle;
-	uint64_t offset;
+	void *map; /* mmap-ed CPU virtual address */
+	uint64_t size; /* size of mmap region */
+	uint32_t handle; /* drm gem handle */
+	uint64_t offset; /* drm gem fake offset for mmap */
 };
 
 struct ane_nn {
-	int fd;
-	void *data;
-	struct anec anec;
-	struct ane_bo chans[TILE_COUNT];
-	struct ane_bo btsp_chan;
+	int fd; /* file descriptor to accel node (index dev_id) */
+	void *data; /* anec content loaded from path */
+	struct anec anec; /* anec header loaded from path */
+	struct ane_bo chans[TILE_COUNT]; /* mmap-ed tile channels */
+	struct ane_bo btsp_chan; /* mmap-ed bootstrap channel */
 };
 
 /* #define LIBANE_CONFIG_STFU_LOG */

@@ -637,6 +637,13 @@ void ane_tile(void *data, void *tile, const uint64_t N, const uint64_t C,
 	const uint64_t H0 = H * W;
 	const uint64_t H1 = new_H * new_W;
 
+	if ((new_H == H) && (new_W == W)) {
+		memcpy(tile, data, N * C * P);
+		return;
+	}
+
+	memset(tile, 0, N * C * P);
+
 	for (uint64_t n = 0; n < N; n++) {
 		for (uint64_t c = 0; c < C; c++) {
 			for (uint64_t h = 0; h < H; h++) {
@@ -646,6 +653,7 @@ void ane_tile(void *data, void *tile, const uint64_t N, const uint64_t C,
 			}
 		}
 	}
+	return;
 }
 
 void ane_untile(void *data, void *tile, const uint64_t N, const uint64_t C,
@@ -661,6 +669,11 @@ void ane_untile(void *data, void *tile, const uint64_t N, const uint64_t C,
 	const uint64_t H0 = H * W;
 	const uint64_t H1 = new_H * new_W;
 
+	if ((new_H == H) && (new_W == W)) {
+		memcpy(data, tile, N * C * H * W * sizeof(uint16_t));
+		return;
+	}
+
 	memset(data, 0, N * C * H * W * sizeof(uint16_t));
 
 	for (uint64_t n = 0; n < N; n++) {
@@ -672,6 +685,7 @@ void ane_untile(void *data, void *tile, const uint64_t N, const uint64_t C,
 			}
 		}
 	}
+	return;
 }
 // clang-format on
 
@@ -682,7 +696,6 @@ static inline void ___ane_tile_send(struct ane_nn *nn, void *from,
 	const int bdx = src_bdx(nn, idx);
 
 	uint16_t tile[tile_size(nn, bdx) / sizeof(uint16_t)];
-	memset(tile, 0, tile_size(nn, bdx));
 
 	ane_tile(from, tile, anec->nchw[bdx][0], anec->nchw[bdx][1],
 		 anec->nchw[bdx][2], anec->nchw[bdx][3], anec->nchw[bdx][4],

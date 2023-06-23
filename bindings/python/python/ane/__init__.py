@@ -39,7 +39,7 @@ class model:
 		res = fmt.parse(open(path, "rb").read()[:fmt.sizeof()])
 		self.src_count, self.dst_count = res.src_count, res.dst_count
 		self.dst_nchw, self.src_nchw = [tuple([tuple(x for x in res.nchw[(base+n)*6:(base+n+1)*6]) for n in range(count)]) for (base, count) in ((4, res.dst_count), (4 + res.dst_count, res.src_count))]
-		self.outputs = [ctypes.create_string_buffer(((nchw[0]*nchw[1]*nchw[4]) + 0x3fff) & -0x4000) for nchw in self.dst_nchw]
+		self.outputs = [ctypes.create_string_buffer(nchw[0]*nchw[1]*nchw[2]*nchw[3]*2) for nchw in self.dst_nchw]
 		self.inputs_pad, self.outputs_pad = [b''] * (0x20 - res.src_count), [b''] * (0x20 - res.dst_count)
 
 	def predict(self, inarrs):  # list of numpy arrays
@@ -48,7 +48,4 @@ class model:
 		self.driver.lib.pyane_send(self.handle, *[arr.tobytes(order='C') for arr in inarrs], *self.inputs_pad)
 		self.driver.lib.pyane_exec(self.handle)
 		self.driver.lib.pyane_read(self.handle, *self.outputs, *self.outputs_pad)
-		return [self.tile2arr(self.outputs[idx], *self.dst_nchw[idx]) for idx in range(self.dst_count)]
-
-	def tile2arr(self, tile, N, C, H, W, P, R):
-		return np.frombuffer(tile[:N * C * P], dtype=np.float16).reshape((N, C, P//R, R//2))[:N, :C, :H, :W]
+		return [np.frombuffer(self.outputs[idx], dtype=np.float16).reshape(*self.dst_nchw[idx][:4]) for idx in range(self.dst_count)]

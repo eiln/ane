@@ -42,7 +42,7 @@
 #define tile_align(x)	   ((((uint64_t)(x)) + TILE_SIZE - 1) & -TILE_SIZE)
 #define tile_size(nn, bdx) (tile_shift(to_anec(nn)->tiles[bdx]))
 
-#define ANEC_HEADER_SIZE   0x800
+#define ANEC_HEADER_SIZE   0x800UL
 #define src_bdx(nn, idx)   (4 + ane_dst_count(nn) + idx)
 #define dst_bdx(nn, idx)   (4 + idx)
 
@@ -121,13 +121,18 @@ static inline int bo_init(struct ane_nn *nn, struct ane_bo *bo)
 
 	bo->handle = args.handle;
 	bo->offset = args.offset;
+
 	return 0;
 }
 
-static inline int bo_free(struct ane_nn *nn, struct ane_bo *bo)
+static inline void bo_free(struct ane_nn *nn, struct ane_bo *bo)
 {
-	struct drm_ane_bo_free args = { .handle = bo->handle };
-	return ioctl(nn->fd, DRM_IOCTL_ANE_BO_FREE, &args);
+	if (bo->handle) {
+		struct drm_ane_bo_free args = { .handle = bo->handle };
+		ioctl(nn->fd, DRM_IOCTL_ANE_BO_FREE, &args);
+	}
+	bo->handle = 0;
+	bo->offset = 0;
 }
 
 static inline int bo_mmap(struct ane_nn *nn, struct ane_bo *bo)
@@ -144,6 +149,15 @@ static inline int bo_mmap(struct ane_nn *nn, struct ane_bo *bo)
 	return 0;
 }
 
+static inline void bo_munmap(struct ane_nn *nn, struct ane_bo *bo)
+{
+	(void)nn;
+	if (bo->map) {
+		munmap(bo->map, bo->size);
+	}
+	bo->map = NULL;
+}
+
 static inline int ane_bo_init(struct ane_nn *nn, struct ane_bo *bo)
 {
 	int err;
@@ -153,30 +167,22 @@ static inline int ane_bo_init(struct ane_nn *nn, struct ane_bo *bo)
 
 	err = bo_init(nn, bo);
 	if (err < 0) {
-		goto error;
+		return err;
 	}
 
 	err = bo_mmap(nn, bo);
 	if (err < 0) {
 		bo_free(nn, bo);
-		goto error;
+		return err;
 	}
 
 	return 0;
-
-error:
-	bo->handle = 0;
-	bo->offset = 0;
-	return err;
 }
 
 static inline void ane_bo_free(struct ane_nn *nn, struct ane_bo *bo)
 {
-	if (bo->map) {
-		munmap(bo->map, bo->size);
-		bo_free(nn, bo);
-	}
-	bo->map = NULL;
+	bo_munmap(nn, bo);
+	bo_free(nn, bo);
 }
 
 static inline void ane_chan_free(struct ane_nn *nn)
@@ -356,7 +362,6 @@ int ane_open(int dev_id)
 		}
 
 		if (dev_id == found) {
-			// ane_log("found device %s fd %d\n", node, fd);
 			return fd;
 		}
 
@@ -428,12 +433,11 @@ struct ane_nn *__ane_init(const char *path, int dev_id)
 {
 	struct ane_nn *nn = ane_zmalloc(sizeof(struct ane_nn));
 	if (!nn) {
-		ane_err("failed to alloc mem for nn struct\n");
 		return NULL;
 	}
 
 	if (ane_model_init(nn, path) < 0) {
-		ane_err("failed to load model at %s\n", path);
+		ane_err("failed to load anec from %s\n", path);
 		free(nn);
 		return NULL;
 	}
@@ -446,6 +450,7 @@ struct ane_nn *__ane_init(const char *path, int dev_id)
 	}
 
 	if (ane_chan_init(nn) < 0) {
+		ane_err("failed to init memory-mapped chans\n");
 		ane_device_close(nn);
 		ane_model_free(nn);
 		free(nn);

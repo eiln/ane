@@ -694,13 +694,9 @@ static inline void ___ane_tile_send(struct ane_nn *nn, void *from,
 {
 	const struct anec *anec = to_anec(nn);
 	const int bdx = src_bdx(nn, idx);
-
-	uint16_t tile[tile_size(nn, bdx) / sizeof(uint16_t)];
-
-	ane_tile(from, tile, anec->nchw[bdx][0], anec->nchw[bdx][1],
-		 anec->nchw[bdx][2], anec->nchw[bdx][3], anec->nchw[bdx][4],
-		 anec->nchw[bdx][5]);
-	memcpy(nn->chans[bdx].map, tile, tile_size(nn, bdx));
+	ane_tile(from, nn->chans[bdx].map, anec->nchw[bdx][0],
+		 anec->nchw[bdx][1], anec->nchw[bdx][2], anec->nchw[bdx][3],
+		 anec->nchw[bdx][4], anec->nchw[bdx][5]);
 }
 
 static inline void ___ane_tile_read(struct ane_nn *nn, void *to,
@@ -708,13 +704,9 @@ static inline void ___ane_tile_read(struct ane_nn *nn, void *to,
 {
 	const struct anec *anec = to_anec(nn);
 	const int bdx = dst_bdx(nn, idx);
-
-	uint16_t tile[tile_size(nn, bdx) / sizeof(uint16_t)];
-	memcpy(tile, nn->chans[bdx].map, tile_size(nn, bdx));
-
-	ane_untile(to, tile, anec->nchw[bdx][0], anec->nchw[bdx][1],
-		   anec->nchw[bdx][2], anec->nchw[bdx][3], anec->nchw[bdx][4],
-		   anec->nchw[bdx][5]);
+	ane_untile(to, nn->chans[bdx].map, anec->nchw[bdx][0],
+		   anec->nchw[bdx][1], anec->nchw[bdx][2], anec->nchw[bdx][3],
+		   anec->nchw[bdx][4], anec->nchw[bdx][5]);
 }
 
 void __ane_tile_send(struct ane_nn *nn, void *from, const uint32_t idx)

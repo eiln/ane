@@ -1,4 +1,3 @@
-
 CC = gcc
 CFLAGS = -I. -I./include -Wall -Werror -Wextra \
 	-Wdeclaration-after-statement \
@@ -22,4 +21,3 @@ uninstall:
 
 clean:
 	rm -f *.so
-

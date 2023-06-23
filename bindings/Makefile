@@ -1,4 +1,2 @@
-
 install:
-	sudo make -C python install
-
+	make -C python install

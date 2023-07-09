@@ -34,10 +34,6 @@ int main(void)
 		return -1;
 	}
 
-	printf("elem: 0x%lx\n", ane_src_elem(nn, 0));
-	printf("elem: 0x%lx\n", ane_src_elem(nn, 1));
-	printf("elem: 0x%lx\n", ane_dst_elem(nn, 0));
-
 	ane_tile_send(nn, Ah, 0);
 	ane_tile_send(nn, Bh, 1);
 

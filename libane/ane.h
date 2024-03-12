@@ -47,7 +47,7 @@ extern "C" {
 
 #include <stdint.h>
 
-#define TILE_COUNT 0x20
+#define TILE_COUNT 0x21
 
 struct anec {
 	const uint64_t size;

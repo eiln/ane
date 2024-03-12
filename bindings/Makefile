@@ -1,2 +1,2 @@
 install:
-	make -C python install
+	make -C python install -I /usr/include

@@ -1,20 +1,17 @@
-LD = /usr/bin/ld.gold
-ifneq ($(KERNELRELEASE),)
-	obj-m := ane.o
-	ane-objs := ./src/ane_drv.o ./src/ane_tm.o
-else
-	KERNELDIR := /lib/modules/$(shell uname -r)/build
- 	PWD := $(shell pwd)
+LD = /usr/bin/ld.lld
+objs-m := ane.o ./src/ane_drv.o ./src/ane_tm.o
+KERNELDIR := /lib/modules/$(shell uname -r)
+PWD := $(shell pwd)
 
+prepare:
 default:
-	sudo cp ./src/uapi/drm/ane_accel.h /lib/modules/$(shell uname -r)/build/include/uapi/drm/
-	make -C $(KERNELDIR) M=$(PWD) modules LD=$(LD) 
+	sudo make -C $(KERNELDIR) M=$(PWD) prepare O=$(PWD)
+	sudo make -C $(KERNELDIR) M=$(PWD) config O=$(PWD)
+	sudo make -C $(KERNELDIR) M=$(PWD) modules O=$(PWD)
 
 headers_install:
-	cp -r src/headers/* /usr/include
+	cp -r src/headers/* $(KERNELDIR)/include/drm
 install:
-	sudo make -C $(KERNELDIR) M=$(PWD) modules_install LD=$(LD) 
-	# sudo depmod -a
 	sudo modprobe ane
 	sudo chmod 666 /dev/accel/accel0
 
@@ -24,4 +21,3 @@ uninstall:
 clean:
 	make -C $(KERNELDIR) M=$(PWD) clean LD=$(LD) 
 
-endif

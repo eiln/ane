@@ -14,8 +14,8 @@
 #include <drm/drm_gem.h>
 #include <drm/drm_ioctl.h>
 
-#include "ane.h"
-#include "ane_tm.h"
+#include <drm/ane.h>
+#include <drm/ane_tm.h>
 
 #define CMD_BUF_BDX 0
 #define KRN_BUF_BDX 1

@@ -3,7 +3,7 @@
 
 #include <linux/iopoll.h>
 
-#include "ane_tm.h"
+#include <ane_tm.h>
 
 #define ANE_TQ_COUNT 8
 static const int TQ_PRTY_TABLE[ANE_TQ_COUNT] = { 0x1, 0x2, 0x3,	 0x4,

@@ -10,6 +10,8 @@ default:
 	sudo cp ./src/uapi/drm/ane_accel.h /lib/modules/$(shell uname -r)/build/include/uapi/drm/
 	make -C $(KERNELDIR) M=$(PWD) modules LD=$(LD) 
 
+headers_install:
+	cp -r src/headers/* /usr/include
 install:
 	sudo make -C $(KERNELDIR) M=$(PWD) modules_install LD=$(LD) 
 	# sudo depmod -a
